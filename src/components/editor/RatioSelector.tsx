@@ -2,18 +2,21 @@ import { getActiveRatio, RATIOS } from "@/lib/ratios";
 import { useEditorStore } from "@/store/editorStore";
 import { RatioIcon } from "./RatioIcon";
 import { CustomRatioControl } from "./CustomRatioControl";
+import { getPlatformPresetById } from "@/constants/platformPresets";
 
 export function RatioSelector() {
   const selectedRatioId = useEditorStore((state) => state.selectedRatioId);
   const setSelectedRatio = useEditorStore((state) => state.setSelectedRatio);
   const customRatio = useEditorStore((state) => state.customRatio);
+  const activePlatformPresetId = useEditorStore((state) => state.activePlatformPresetId);
+  const activePreset = getPlatformPresetById(activePlatformPresetId);
 
   return (
     <div aria-label="Aspect ratio" role="group" className="flex w-full flex-col items-center gap-3">
       <div className="max-w-full overflow-x-auto pb-1">
         <div className="mx-auto flex w-max items-center gap-1 rounded-[18px] border border-black/[0.04] bg-[#ececeb] p-1.5 shadow-[0_3px_10px_rgba(0,0,0,0.03)]">
         {RATIOS.map((ratio) => {
-          const selected = ratio.id === selectedRatioId;
+          const selected = ratio.id === selectedRatioId || (selectedRatioId === "platform" && !!activePreset && ratio.value === activePreset.width / activePreset.height);
 
           return (
             <button

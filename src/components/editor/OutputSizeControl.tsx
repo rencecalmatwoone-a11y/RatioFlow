@@ -2,6 +2,7 @@ import { useState } from "react";
 import { calculateExportGeometry } from "@/lib/exportImage";
 import { dimensionsFromSide, MAX_EXPORT_DIMENSION, MIN_OUTPUT_DIMENSION, parseOutputInput, requestedLongestSide } from "@/lib/exportDimensions";
 import { getActiveRatio } from "@/lib/ratios";
+import { getPlatformPresetById, getPlatformName } from "@/constants/platformPresets";
 import { useEditorStore } from "@/store/editorStore";
 
 export function OutputSizeControl({ onValidityChange }: { onValidityChange: (valid: boolean) => void }) {
@@ -10,6 +11,7 @@ export function OutputSizeControl({ onValidityChange }: { onValidityChange: (val
   const setCustomSide = useEditorStore((state) => state.setCustomExportSide);
   const ratioId = useEditorStore((state) => state.selectedRatioId);
   const customRatio = useEditorStore((state) => state.customRatio);
+  const activePlatformPresetId = useEditorStore((state) => state.activePlatformPresetId);
   const imageWidth = useEditorStore((state) => state.imageWidth);
   const imageHeight = useEditorStore((state) => state.imageHeight);
   const focalPoint = useEditorStore((state) => state.focalPoint);
@@ -17,17 +19,18 @@ export function OutputSizeControl({ onValidityChange }: { onValidityChange: (val
   const viewMode = useEditorStore((state) => state.viewMode);
   const [draft, setDraft] = useState<string | null>(null);
   const [error, setError] = useState("");
-  const ratio = getActiveRatio(ratioId, customRatio);
+  const activePreset = getPlatformPresetById(activePlatformPresetId);
+  const ratio = getActiveRatio(ratioId, customRatio, activePlatformPresetId);
   const requested = dimensionsFromSide(ratio, size.customSide, size.customAxis);
   let geometry = null;
   try {
     geometry = imageWidth && imageHeight
-      ? calculateExportGeometry(imageWidth, imageHeight, ratio, focalPoint, zoom, viewMode, size)
+      ? calculateExportGeometry(imageWidth, imageHeight, ratio, focalPoint, zoom, viewMode, size, undefined, activePreset)
       : null;
   } catch {
     // The export path will reject an image too small for the selected ratio.
   }
-  const limit = geometry && (requestedLongestSide(ratio, size) ?? 0) > Math.max(geometry.outputWidth, geometry.outputHeight);
+  const limit = geometry && (requestedLongestSide(ratio, size, activePreset) ?? 0) > Math.max(geometry.outputWidth, geometry.outputHeight);
 
   function edit(value: string, axis: "width" | "height") {
     setDraft(value);
@@ -47,6 +50,7 @@ export function OutputSizeControl({ onValidityChange }: { onValidityChange: (val
       <label htmlFor="export-size" className="mb-2 block text-xs font-medium">Size</label>
       <select id="export-size" value={size.preset} onChange={(event) => { setPreset(event.currentTarget.value as typeof size.preset); setDraft(null); setError(""); onValidityChange(true); }} className="min-h-11 w-full rounded-lg border border-[#dededb] bg-white px-3 text-sm focus-visible:outline-2 focus-visible:outline-[#181818]">
         <option value="original">Original / Maximum</option>
+        {activePreset && <option value="preset">{getPlatformName(activePreset.platform)} · {activePreset.name} ({activePreset.width} × {activePreset.height})</option>}
         <option value="1080">1080px</option>
         <option value="1440">1440px</option>
         <option value="2160">2160px</option>

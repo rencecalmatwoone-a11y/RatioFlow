@@ -29,6 +29,7 @@ export type ImageExportInput = {
   viewMode: ViewMode;
   options: ExportOptions;
   exportSize?: ExportSize;
+  presetDimensions?: AspectRatio;
   longestSideOverride?: number;
 };
 
@@ -44,6 +45,7 @@ export function calculateExportGeometry(
   viewMode: ViewMode,
   exportSize?: ExportSize,
   longestSideOverride?: number,
+  presetDimensions?: AspectRatio,
 ): ExportGeometry {
   if (![imageWidth, imageHeight, ratio.width, ratio.height, zoom].every((value) => Number.isFinite(value) && value > 0)) {
     throw new Error("Invalid export dimensions");
@@ -53,7 +55,7 @@ export function calculateExportGeometry(
   const sourceScale = viewMode === "fill" ? baseScale / zoom : baseScale;
   const sourceWidth = viewMode === "fill" ? sourceScale * ratio.width : imageWidth;
   const sourceHeight = viewMode === "fill" ? sourceScale * ratio.height : imageHeight;
-  const { width: outputWidth, height: outputHeight } = calculateOutputDimensions(sourceScale, ratio, exportSize, longestSideOverride);
+  const { width: outputWidth, height: outputHeight } = calculateOutputDimensions(sourceScale, ratio, exportSize, longestSideOverride, presetDimensions);
   const sourceX = viewMode === "fill"
     ? clamp((Number.isFinite(focalPoint.x) ? focalPoint.x : 0.5) * imageWidth - sourceWidth / 2, 0, imageWidth - sourceWidth)
     : 0;
@@ -107,7 +109,7 @@ async function decodeOriginal(file: File): Promise<{ image: CanvasImageSource; c
 
 export async function exportImage(input: ImageExportInput): Promise<Blob> {
   const geometry = calculateExportGeometry(
-    input.imageWidth, input.imageHeight, input.ratio, input.focalPoint, input.zoom, input.viewMode, input.exportSize, input.longestSideOverride,
+    input.imageWidth, input.imageHeight, input.ratio, input.focalPoint, input.zoom, input.viewMode, input.exportSize, input.longestSideOverride, input.presetDimensions,
   );
   const { mime } = EXPORT_FORMATS[input.options.format];
   const decoded = await decodeOriginal(input.file);

@@ -1,3 +1,5 @@
+import { getPlatformPresetById, getPresetRatio } from "../constants/platformPresets.ts";
+
 export interface RatioPreset {
   id: string;
   name: string;
@@ -16,7 +18,7 @@ export const RATIOS = [
 ] as const satisfies readonly RatioPreset[];
 
 export type RatioPresetId = (typeof RATIOS)[number]["id"];
-export type RatioId = RatioPresetId | "custom";
+export type RatioId = RatioPresetId | "custom" | "platform";
 export type CustomRatio = { width: number; height: number };
 export const MIN_RATIO_VALUE = 0.1;
 export const MAX_RATIO_VALUE = 100;
@@ -38,7 +40,11 @@ export function isValidCustomRatio(ratio: CustomRatio): boolean {
   return [ratio.width, ratio.height].every((side) => Number.isFinite(side) && side >= MIN_RATIO_VALUE && side <= MAX_RATIO_VALUE);
 }
 
-export function getActiveRatio(selectedRatioId: RatioId, customRatio: CustomRatio) {
+export function getActiveRatio(selectedRatioId: RatioId, customRatio: CustomRatio, activePlatformPresetId: string | null = null) {
+  if (selectedRatioId === "platform") {
+    const preset = getPlatformPresetById(activePlatformPresetId);
+    return preset ? getPresetRatio(preset) : DEFAULT_RATIO;
+  }
   if (selectedRatioId !== "custom") return getRatioPreset(selectedRatioId);
   const valid = isValidCustomRatio(customRatio) ? customRatio : DEFAULT_CUSTOM_RATIO;
   return { id: "custom" as const, name: "Custom", label: `${valid.width}:${valid.height}`, ...valid, value: valid.width / valid.height };

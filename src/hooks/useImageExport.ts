@@ -4,6 +4,7 @@ import { downloadZip } from "@/lib/downloadZip";
 import { exportMultiple } from "@/lib/exportMultiple";
 import { exportZipFilename } from "@/lib/fileName";
 import { RATIOS, type RatioId } from "@/lib/ratios";
+import { getPlatformPresetById } from "@/constants/platformPresets";
 import { useEditorStore } from "@/store/editorStore";
 
 export function useImageExport() {
@@ -37,6 +38,8 @@ export function useImageExport() {
       viewMode: state.viewMode,
       options: { format: state.exportFormat, quality: state.exportQuality },
       exportSize: state.exportSize,
+      presetDimensions: getPlatformPresetById(state.activePlatformPresetId),
+      platformPresetId: state.activePlatformPresetId ?? undefined,
       customRatio: state.customRatio,
       currentRatio: state.selectedRatioId,
       multiRatio: !currentOnly && ratioIds.length > 1,

@@ -3,10 +3,12 @@
 import { useRef, type ChangeEvent } from "react";
 import { IMAGE_ACCEPT, useImage } from "@/hooks/useImage";
 import { getActiveRatio } from "@/lib/ratios";
+import { getPlatformName, getPlatformPresetById } from "@/constants/platformPresets";
 import { useEditorStore } from "@/store/editorStore";
 import { ExportMenu } from "./ExportMenu";
 import { ImageViewport } from "./ImageViewport";
 import { RatioSelector } from "./RatioSelector";
+import { PlatformPresetSelector } from "./PlatformPresetSelector";
 import { UploadArea } from "./UploadArea";
 import { ZoomControl } from "./ZoomControl";
 
@@ -21,6 +23,8 @@ export function ImageWorkspace() {
   const imageHeight = useEditorStore((state) => state.imageHeight);
   const selectedRatioId = useEditorStore((state) => state.selectedRatioId);
   const customRatio = useEditorStore((state) => state.customRatio);
+  const activePlatformPresetId = useEditorStore((state) => state.activePlatformPresetId);
+  const activePreset = getPlatformPresetById(activePlatformPresetId);
   const resetPosition = useEditorStore((state) => state.resetPosition);
   const { loadImage, clearImage, error, reportError, isLoading } = useImage();
   const replaceInput = useRef<HTMLInputElement>(null);
@@ -43,7 +47,7 @@ export function ImageWorkspace() {
     <section aria-label="Image editor" className="mx-auto w-full max-w-[760px]">
       <div className="mb-4 flex items-center justify-between px-1 text-[11px] font-medium tracking-[0.1em] text-[#858585] uppercase sm:mb-5">
         <span>Preview</span>
-        <span>{getActiveRatio(selectedRatioId, customRatio).label} frame</span>
+        <span>{getActiveRatio(selectedRatioId, customRatio, activePlatformPresetId).label} frame</span>
       </div>
       <ImageViewport url={imageUrl} name={imageName} />
       <div className="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-1 text-xs text-[#858585]">
@@ -57,6 +61,10 @@ export function ImageWorkspace() {
       </div>
       {error && <p role="alert" className="mt-2 px-1 text-sm text-[#a54747]">{error}</p>}
       <div className="mt-7 flex flex-col items-center gap-5 sm:mt-8">
+        <div className="flex flex-col items-center gap-1">
+          <PlatformPresetSelector />
+          {activePreset && <p className="text-center text-[11px] text-[#777]">{getPlatformName(activePreset.platform)} · {activePreset.name} · {activePreset.width} × {activePreset.height}</p>}
+        </div>
         <RatioSelector />
         <ZoomControl />
         <ExportMenu />

@@ -20,8 +20,12 @@ export function dimensionsFromSide(ratio: AspectRatio, side: number, axis: "widt
     : { width: Math.max(1, Math.round(side * ratio.width / ratio.height)), height: side };
 }
 
-export function requestedLongestSide(ratio: AspectRatio, size: ExportSize): number | null {
+export function requestedLongestSide(ratio: AspectRatio, size: ExportSize, presetDimensions?: AspectRatio): number | null {
   if (size.preset === "original") return null;
+  if (size.preset === "preset") {
+    if (!presetDimensions) throw new Error("No platform preset is selected");
+    return Math.max(presetDimensions.width, presetDimensions.height);
+  }
   if (size.preset !== "custom") return Number(size.preset);
   if (!isValidOutputInput(size.customSide)) throw new Error("Invalid custom output size");
   const dimensions = dimensionsFromSide(ratio, size.customSide, size.customAxis);
@@ -34,6 +38,7 @@ export function calculateOutputDimensions(
   ratio: AspectRatio,
   size: ExportSize = { preset: "original", customSide: 1920, customAxis: "width" },
   longestSideOverride?: number,
+  presetDimensions?: AspectRatio,
 ) {
   if (![sourceScale, ratio.width, ratio.height].every((value) => Number.isFinite(value) && value > 0)) {
     throw new Error("Invalid export dimensions");
@@ -47,7 +52,7 @@ export function calculateOutputDimensions(
     MAX_EXPORT_DIMENSION,
     Math.sqrt(MAX_EXPORT_PIXELS * longest / Math.min(ratio.width, ratio.height)),
   ));
-  const requested = longestSideOverride ?? requestedLongestSide(ratio, size);
+  const requested = longestSideOverride ?? requestedLongestSide(ratio, size, presetDimensions);
   if (requested !== null && (!Number.isFinite(requested) || requested <= 0)) throw new Error("Invalid output size");
 
   // Keep exact integer preset dimensions for the existing Original export path.

@@ -9,7 +9,7 @@ const iconSizes: Record<RatioPresetId, string> = {
 };
 
 export function RatioIcon({ ratio, customRatio }: { ratio: RatioId; customRatio?: CustomRatio }) {
-  if (ratio === "custom") {
+  if (ratio === "custom" || ratio === "platform") {
     const value = (customRatio?.width ?? 21) / (customRatio?.height ?? 9);
     const width = value >= 1 ? 24 : Math.max(5, 21 * value);
     const height = value >= 1 ? Math.max(5, 21 / value) : 21;

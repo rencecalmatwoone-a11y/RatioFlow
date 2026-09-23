@@ -15,9 +15,10 @@ function exportBaseName(imageName: string): string {
     .replace(/[. ]+$/, "") || "image";
 }
 
-export function exportFilename(imageName: string, ratioId: RatioId, format: ExportFormat, customLabel?: string): string {
-  const label = ratioId === "custom" ? (customLabel ?? "custom") : ratioId;
-  return `${exportBaseName(imageName)}-${label.replace(":", "x")}.${EXPORT_FORMATS[format].extension}`;
+export function exportFilename(imageName: string, ratioId: RatioId, format: ExportFormat, customLabel?: string, platformPresetId?: string): string {
+  const label = ratioId === "platform" ? (platformPresetId ?? "platform") : ratioId === "custom" ? (customLabel ?? "custom") : ratioId;
+  const safeLabel = label.toLowerCase().replace(/:/g, "x").replace(/[^a-z0-9.-]+/g, "-").replace(/^[.-]+|[.-]+$/g, "") || "image";
+  return `${exportBaseName(imageName)}-${safeLabel}.${EXPORT_FORMATS[format].extension}`;
 }
 
 export function exportZipFilename(imageName: string): string {

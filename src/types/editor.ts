@@ -22,7 +22,9 @@ export type FocalPoint = {
 export type ViewMode = "fit" | "fill";
 
 export type ExportFormat = "png" | "jpeg" | "webp";
-export type ExportSizePreset = "original" | "1080" | "1440" | "2160" | "custom";
+export type PlatformId = "instagram" | "tiktok" | "youtube" | "x" | "facebook" | "linkedin";
+export type PlatformPreset = AspectRatio & { id: string; platform: PlatformId; name: string; description?: string; category?: string };
+export type ExportSizePreset = "original" | "preset" | "1080" | "1440" | "2160" | "custom";
 export type ExportSize = { preset: ExportSizePreset; customSide: number; customAxis: "width" | "height" };
 
 export type ExportOptions = {
@@ -37,6 +39,7 @@ export interface EditorState {
   imageHeight: number | null;
   imageName: string | null;
   selectedRatioId: RatioId;
+  activePlatformPresetId: string | null;
   customRatio: CustomRatio;
   selectedExportRatios: RatioPresetId[];
   crop: CropPosition;
@@ -52,7 +55,8 @@ export interface EditorState {
   exportSize: ExportSize;
   setImage: (file: File, url: string, width: number, height: number) => void;
   clearImage: () => void;
-  setSelectedRatio: (ratioId: RatioId) => void;
+  setSelectedRatio: (ratioId: RatioPresetId | "custom") => void;
+  setActivePlatformPreset: (id: string) => void;
   setCustomRatio: (width: number, height: number) => void;
   setExportSizePreset: (preset: ExportSizePreset) => void;
   setCustomExportSide: (side: number, axis: "width" | "height") => void;
