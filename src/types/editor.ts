@@ -14,6 +14,8 @@ export type CropPosition = {
   y: number;
 };
 
+export type ViewMode = "fit" | "fill";
+
 export interface EditorState {
   imageFile: File | null;
   imageUrl: string | null;
@@ -22,8 +24,17 @@ export interface EditorState {
   imageName: string | null;
   selectedRatioId: RatioPresetId;
   crop: CropPosition;
+  zoom: number;
+  minZoom: number;
+  maxZoom: number;
+  viewMode: ViewMode;
+  lastFillCrop: CropPosition;
+  lastFillZoom: number;
   setImage: (file: File, url: string, width: number, height: number) => void;
   clearImage: () => void;
   setSelectedRatio: (ratioId: RatioPresetId) => void;
   setCrop: (crop: CropPosition) => void;
+  setZoom: (zoom: number) => void;
+  setViewMode: (mode: ViewMode) => void;
+  resetZoom: () => void;
 }

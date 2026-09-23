@@ -12,6 +12,11 @@ export function ImageViewport({ url, name }: ImageViewportProps) {
   const selectedRatioId = useEditorStore((state) => state.selectedRatioId);
   const crop = useEditorStore((state) => state.crop);
   const setCrop = useEditorStore((state) => state.setCrop);
+  const zoom = useEditorStore((state) => state.zoom);
+  const minZoom = useEditorStore((state) => state.minZoom);
+  const maxZoom = useEditorStore((state) => state.maxZoom);
+  const setZoom = useEditorStore((state) => state.setZoom);
+  const viewMode = useEditorStore((state) => state.viewMode);
   const [isDragging, setIsDragging] = useState(false);
   const ratio = getRatioPreset(selectedRatioId);
 
@@ -27,14 +32,17 @@ export function ImageViewport({ url, name }: ImageViewportProps) {
         image={url}
         crop={crop}
         onCropChange={setCrop}
-        zoom={1}
-        minZoom={1}
-        maxZoom={1}
+        zoom={zoom}
+        minZoom={minZoom}
+        maxZoom={maxZoom}
+        onZoomChange={setZoom}
         zoomWithScroll={false}
         aspect={ratio.value}
-        objectFit="cover"
+        objectFit={viewMode === "fill" ? "cover" : "contain"}
         restrictPosition
         showGrid={false}
+        keyboardStep={8}
+        onTouchRequest={(event) => event.touches.length <= 2}
         onInteractionStart={({ source }) => {
           if (source === "mouse" || source === "touch") setIsDragging(true);
         }}
@@ -43,6 +51,7 @@ export function ImageViewport({ url, name }: ImageViewportProps) {
           containerStyle: { cursor: isDragging ? "grabbing" : "grab" },
           cropAreaStyle: { border: 0, boxShadow: "none" },
         }}
+        classes={{ cropAreaClassName: "ratio-crop-area" }}
         cropperProps={{ "aria-label": `Reposition ${name}. Use arrow keys to move the image.` }}
         mediaProps={{ draggable: false }}
       />
