@@ -1,14 +1,51 @@
+import { useState } from "react";
+import Cropper from "react-easy-crop";
+import { getRatioPreset } from "@/lib/ratios";
+import { useEditorStore } from "@/store/editorStore";
+
 interface ImageViewportProps {
   url: string;
   name: string;
 }
 
 export function ImageViewport({ url, name }: ImageViewportProps) {
+  const selectedRatioId = useEditorStore((state) => state.selectedRatioId);
+  const crop = useEditorStore((state) => state.crop);
+  const setCrop = useEditorStore((state) => state.setCrop);
+  const [isDragging, setIsDragging] = useState(false);
+  const ratio = getRatioPreset(selectedRatioId);
+
   return (
-    <div className="aspect-video w-full overflow-hidden rounded-[20px] border border-black/[0.07] bg-[#e8e7de] shadow-[0_12px_35px_rgba(0,0,0,0.07),0_2px_8px_rgba(0,0,0,0.03)] sm:rounded-[24px]">
-      {/* A browser object URL is already local and needs no image optimization. */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={url} alt={name} className="h-full w-full object-cover" />
+    <div
+      className="ratio-viewport relative mx-auto overflow-hidden rounded-[20px] border border-black/[0.07] bg-[#e8e7de] shadow-[0_12px_35px_rgba(0,0,0,0.07),0_2px_8px_rgba(0,0,0,0.03)] sm:rounded-[24px]"
+      style={{
+        width: `min(100%, ${80 * ratio.value}svh, ${650 * ratio.value}px)`,
+        aspectRatio: `${ratio.width} / ${ratio.height}`,
+      }}
+    >
+      <Cropper
+        image={url}
+        crop={crop}
+        onCropChange={setCrop}
+        zoom={1}
+        minZoom={1}
+        maxZoom={1}
+        zoomWithScroll={false}
+        aspect={ratio.value}
+        objectFit="cover"
+        restrictPosition
+        showGrid={false}
+        onInteractionStart={({ source }) => {
+          if (source === "mouse" || source === "touch") setIsDragging(true);
+        }}
+        onInteractionEnd={() => setIsDragging(false)}
+        style={{
+          containerStyle: { cursor: isDragging ? "grabbing" : "grab" },
+          cropAreaStyle: { border: 0, boxShadow: "none" },
+        }}
+        cropperProps={{ "aria-label": `Reposition ${name}. Use arrow keys to move the image.` }}
+        mediaProps={{ draggable: false }}
+      />
     </div>
   );
 }

@@ -4,6 +4,17 @@ body {
   margin: 0;
 }
 
+.ratio-viewport {
+  transition: width 380ms cubic-bezier(0.22, 1, 0.36, 1),
+    aspect-ratio 380ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ratio-viewport {
+    transition: none;
+  }
+}
+
 .preview-landscape {
   position: relative;
   isolation: isolate;

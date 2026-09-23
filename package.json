@@ -13,6 +13,7 @@
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "react-dropzone": "^20.1.2",
+    "react-easy-crop": "^6.2.3",
     "tailwindcss": "^4.3.3",
     "zustand": "^5.0.15"
   },
