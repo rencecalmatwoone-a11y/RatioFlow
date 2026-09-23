@@ -1,23 +1,9 @@
-import type { RatioPresetId } from "@/lib/ratios";
-import type { AspectRatio, ExportFormat, ExportOptions, FocalPoint, ViewMode } from "@/types/editor";
+import { EXPORT_FORMATS } from "./fileName.ts";
+export { exportFilename, EXPORT_FORMATS } from "./fileName.ts";
+import type { AspectRatio, ExportOptions, FocalPoint, ViewMode } from "@/types/editor";
 
 export const MAX_EXPORT_DIMENSION = 8192;
 export const MAX_EXPORT_PIXELS = 32_000_000;
-
-export const EXPORT_FORMATS: Record<ExportFormat, { mime: string; extension: string }> = {
-  png: { mime: "image/png", extension: "png" },
-  jpeg: { mime: "image/jpeg", extension: "jpg" },
-  webp: { mime: "image/webp", extension: "webp" },
-};
-
-export function exportFilename(imageName: string, ratioId: RatioPresetId, format: ExportFormat): string {
-  const base = imageName
-    .replace(/\.[^.]+$/, "")
-    .replace(/[<>:"/\\|?*\x00-\x1f]/g, "-")
-    .trim()
-    .replace(/[. ]+$/, "") || "image";
-  return `${base}-${ratioId.replace(":", "x")}.${EXPORT_FORMATS[format].extension}`;
-}
 
 export type ExportGeometry = {
   sourceX: number;

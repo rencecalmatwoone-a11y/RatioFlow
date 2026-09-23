@@ -90,6 +90,43 @@ test("Canvas receives the original-image crop and encodes each requested MIME ty
   }
 });
 
+test("Fit leaves PNG and WebP padding transparent and paints JPEG padding white", async () => {
+  const originalBitmap = globalThis.createImageBitmap;
+  const originalDocument = globalThis.document;
+  const fills = [];
+  const draws = [];
+  globalThis.createImageBitmap = async () => ({ close: () => {} });
+  globalThis.document = {
+    createElement: () => ({
+      width: 0,
+      height: 0,
+      getContext: () => ({
+        set fillStyle(value) { this.color = value; },
+        fillRect(...args) { fills.push([this.color, ...args]); },
+        drawImage(...args) { draws.push(args); },
+      }),
+      toBlob(callback, mime) { callback(new Blob(["encoded"], { type: mime })); },
+    }),
+  };
+  try {
+    for (const format of ["png", "webp", "jpeg"]) {
+      fills.length = 0;
+      draws.length = 0;
+      await exportImage({
+        file: new File(["source"], "source.png", { type: "image/png" }),
+        imageWidth: 4000, imageHeight: 3000,
+        ratio: { width: 1, height: 1 }, focalPoint: { x: 0.8, y: 0.2 },
+        zoom: 1, viewMode: "fit", options: { format, quality: 0.9 },
+      });
+      assert.deepEqual(draws[0].slice(1), [0, 0, 4000, 3000, 0, 375, 3000, 2250]);
+      assert.deepEqual(fills, format === "jpeg" ? [["#FFFFFF", 0, 0, 3000, 3000]] : []);
+    }
+  } finally {
+    globalThis.createImageBitmap = originalBitmap;
+    globalThis.document = originalDocument;
+  }
+});
+
 test("download URLs are revoked after the browser can start the download", () => {
   const originalDocument = globalThis.document;
   const originalWindow = globalThis.window;

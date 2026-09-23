@@ -35,6 +35,7 @@ export interface EditorState {
   imageHeight: number | null;
   imageName: string | null;
   selectedRatioId: RatioPresetId;
+  selectedExportRatios: RatioPresetId[];
   crop: CropPosition;
   focalPoint: FocalPoint;
   zoom: number;
@@ -48,6 +49,9 @@ export interface EditorState {
   setImage: (file: File, url: string, width: number, height: number) => void;
   clearImage: () => void;
   setSelectedRatio: (ratioId: RatioPresetId) => void;
+  toggleExportRatio: (ratioId: RatioPresetId) => void;
+  selectAllExportRatios: () => void;
+  clearExportRatios: () => void;
   setCrop: (crop: CropPosition) => void;
   setFocalPoint: (point: FocalPoint) => void;
   resetPosition: () => void;

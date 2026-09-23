@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useImageExport } from "@/hooks/useImageExport";
+import { RATIOS } from "@/lib/ratios";
 import { useEditorStore } from "@/store/editorStore";
 import type { ExportFormat } from "@/types/editor";
 
@@ -17,7 +18,11 @@ export function ExportMenu() {
   const exportQuality = useEditorStore((state) => state.exportQuality);
   const setExportFormat = useEditorStore((state) => state.setExportFormat);
   const setExportQuality = useEditorStore((state) => state.setExportQuality);
-  const { downloadCurrent, isExporting, error, clearError } = useImageExport();
+  const selectedExportRatios = useEditorStore((state) => state.selectedExportRatios);
+  const toggleExportRatio = useEditorStore((state) => state.toggleExportRatio);
+  const selectAllExportRatios = useEditorStore((state) => state.selectAllExportRatios);
+  const clearExportRatios = useEditorStore((state) => state.clearExportRatios);
+  const { downloadCurrent, downloadSelected, downloadAll, isExporting, status, error, clearError } = useImageExport();
 
   useEffect(() => {
     if (!isOpen) return;
@@ -55,7 +60,7 @@ export function ExportMenu() {
               trigger.current?.focus();
             }
           }}
-          className="absolute bottom-full left-1/2 z-20 mb-3 w-64 -translate-x-1/2 rounded-2xl border border-[#e6e6e4] bg-white p-4 text-[#242424] shadow-[0_12px_35px_rgba(0,0,0,0.12)]"
+          className="absolute bottom-full left-1/2 z-20 mb-3 max-h-[min(80vh,36rem)] w-[min(18rem,calc(100vw-2rem))] -translate-x-1/2 overflow-y-auto rounded-2xl border border-[#e6e6e4] bg-white p-4 text-[#242424] shadow-[0_12px_35px_rgba(0,0,0,0.12)]"
         >
           <label htmlFor="export-format" className="mb-2 block text-xs font-medium">Format</label>
           <select
@@ -83,15 +88,54 @@ export function ExportMenu() {
               />
             </div>
           )}
+          <fieldset className="mt-4 border-t border-[#ececea] pt-3">
+            <legend className="sr-only">Export ratios</legend>
+            <div className="flex items-center justify-between gap-2">
+              <span aria-hidden="true" className="text-xs font-medium">Export ratios</span>
+              <div className="flex items-center gap-3 text-xs">
+                <button type="button" onClick={selectAllExportRatios} className="rounded-sm underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#181818]">Select all</button>
+                <button type="button" onClick={clearExportRatios} className="rounded-sm underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#181818]">Clear</button>
+              </div>
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1">
+              {RATIOS.map((ratio) => (
+                <label key={ratio.id} className="flex min-h-9 cursor-pointer items-center gap-2 rounded-md px-1 text-sm focus-within:outline-2 focus-within:outline-offset-1 focus-within:outline-[#181818]">
+                  <input
+                    type="checkbox"
+                    checked={selectedExportRatios.includes(ratio.id)}
+                    onChange={() => toggleExportRatio(ratio.id)}
+                    className="size-4 accent-[#242424]"
+                  />
+                  <span>{ratio.label}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
           <button
             type="button"
             onClick={() => void downloadCurrent()}
             disabled={isExporting}
-            aria-busy={isExporting}
             className="mt-4 min-h-11 w-full rounded-full bg-[#1e1e1e] px-4 text-sm font-medium text-white disabled:cursor-wait disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#181818]"
           >
-            {isExporting ? "Exporting..." : "Download Current"}
+            Download Current
           </button>
+          <button
+            type="button"
+            onClick={() => void downloadSelected()}
+            disabled={isExporting || selectedExportRatios.length === 0}
+            className="mt-2 min-h-11 w-full rounded-full border border-[#dededb] px-4 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#181818]"
+          >
+            Download Selected
+          </button>
+          <button
+            type="button"
+            onClick={() => void downloadAll()}
+            disabled={isExporting}
+            className="mt-2 min-h-11 w-full rounded-full border border-[#dededb] px-4 text-sm font-medium disabled:cursor-wait disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#181818]"
+          >
+            Download All
+          </button>
+          <p aria-live="polite" className="mt-2 text-xs text-[#62625e] empty:hidden">{status}</p>
           <p aria-live="polite" className="mt-2 text-xs text-[#a54747] empty:hidden">{error}</p>
         </div>
       )}

@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { DEFAULT_RATIO } from "@/lib/ratios";
+import { DEFAULT_RATIO, RATIOS } from "@/lib/ratios";
 import { clampFocalPoint } from "@/lib/focalPoint";
 import type { EditorState } from "@/types/editor";
 
@@ -17,6 +17,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   imageHeight: null,
   imageName: null,
   selectedRatioId: DEFAULT_RATIO.id,
+  selectedExportRatios: [DEFAULT_RATIO.id],
   crop: { x: 0, y: 0 },
   focalPoint: CENTER_FOCAL,
   zoom: DEFAULT_ZOOM,
@@ -32,6 +33,13 @@ export const useEditorStore = create<EditorState>((set) => ({
     exportQuality: Number.isFinite(quality) ? Math.min(1, Math.max(0, quality)) : state.exportQuality,
   })),
   setSelectedRatio: (ratioId) => set({ selectedRatioId: ratioId }),
+  toggleExportRatio: (ratioId) => set((state) => ({
+    selectedExportRatios: state.selectedExportRatios.includes(ratioId)
+      ? state.selectedExportRatios.filter((id) => id !== ratioId)
+      : RATIOS.filter((ratio) => ratio.id === ratioId || state.selectedExportRatios.includes(ratio.id)).map((ratio) => ratio.id),
+  })),
+  selectAllExportRatios: () => set({ selectedExportRatios: RATIOS.map((ratio) => ratio.id) }),
+  clearExportRatios: () => set({ selectedExportRatios: [] }),
   setCrop: (crop) => set((state) => ({
     crop,
     ...(state.viewMode === "fill" ? { lastFillCrop: crop } : {}),
@@ -73,6 +81,7 @@ export const useEditorStore = create<EditorState>((set) => ({
         imageWidth: width,
         imageHeight: height,
         imageName: file.name,
+        selectedExportRatios: [state.selectedRatioId],
         crop: { x: 0, y: 0 },
         focalPoint: CENTER_FOCAL,
         zoom: DEFAULT_ZOOM,
@@ -92,6 +101,7 @@ export const useEditorStore = create<EditorState>((set) => ({
         imageWidth: null,
         imageHeight: null,
         imageName: null,
+        selectedExportRatios: [state.selectedRatioId],
         crop: { x: 0, y: 0 },
         focalPoint: CENTER_FOCAL,
         zoom: DEFAULT_ZOOM,
