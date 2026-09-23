@@ -83,7 +83,7 @@ test("multi-ratio exports size each file separately and custom uses a descriptiv
       exportSize: size("1080"),
     };
     const files = await exportMultiple(source, RATIOS.map((ratio) => ratio.id));
-    assert.deepEqual(await Promise.all(files.map((file) => file.blob.text())), ["608x1080", "1080x1080", "864x1080", "1080x720", "1080x608"]);
+    assert.deepEqual(await Promise.all(files.map((file) => file.blob.text())), ["608x1080", "1080x1080", "864x1080", "1080x810", "1080x720", "1080x608"]);
     const custom = await exportMultiple({ ...source, exportSize: size("custom", 1920), customRatio: { width: 21, height: 9 } }, ["custom"]);
     assert.equal(custom[0].name, "photo-21x9.webp");
     assert.equal(await custom[0].blob.text(), "1920x823");

@@ -32,8 +32,16 @@ body {
 }
 
 .ratio-viewport {
+  overflow: visible;
   transition: width 260ms cubic-bezier(0.22, 1, 0.36, 1),
     aspect-ratio 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.ratio-canvas {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
 }
 
 .ratio-viewport--resizing {
@@ -53,8 +61,8 @@ body {
   user-select: none;
 }
 
-.ratio-resize-handle--left { left: 0; justify-content: flex-start; }
-.ratio-resize-handle--right { right: 0; justify-content: flex-end; }
+.ratio-resize-handle--left { left: -26px; justify-content: flex-end; }
+.ratio-resize-handle--right { right: -26px; justify-content: flex-start; }
 
 .ratio-resize-grip {
   display: block;
@@ -63,15 +71,16 @@ body {
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.78);
   box-shadow: 0 0 0 1px rgba(28, 28, 28, 0.12), 0 1px 5px rgba(0, 0, 0, 0.15);
-  opacity: 0.7;
+  opacity: 0;
   transition: opacity 140ms ease, background-color 140ms ease, box-shadow 140ms ease;
 }
 
-.ratio-resize-handle--left .ratio-resize-grip { margin-left: 2px; }
-.ratio-resize-handle--right .ratio-resize-grip { margin-right: 2px; }
+.ratio-resize-handle--left .ratio-resize-grip,
+.ratio-resize-handle--right .ratio-resize-grip { margin-inline: 0; }
 
-.ratio-resize-handle:hover .ratio-resize-grip,
-.ratio-resize-handle:focus-visible .ratio-resize-grip {
+.ratio-viewport:has(.ratio-resize-handle:hover) .ratio-resize-grip,
+.ratio-viewport:has(.ratio-resize-handle:focus-visible) .ratio-resize-grip,
+.ratio-resize-handle--active .ratio-resize-grip {
   background: white;
   opacity: 1;
   box-shadow: 0 0 0 1px rgba(28, 28, 28, 0.2), 0 1px 7px rgba(0, 0, 0, 0.24);

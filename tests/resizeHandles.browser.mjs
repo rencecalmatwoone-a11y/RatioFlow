@@ -58,6 +58,9 @@ async function handlePoint(side) {
 }
 async function mouseDrag(side, delta, checkDuringDrag) {
   const point = await handlePoint(side);
+  assert.ok(point.y > 0 && point.y < 900, `The ${side} handle is in the viewport: ${JSON.stringify(point)}`);
+  const hit = await evaluate(`document.elementFromPoint(${point.x}, ${point.y})?.outerHTML.slice(0, 240)`);
+  assert.ok(hit?.includes("ratio-resize"), `Pointer hits the ${side} handle: ${hit}`);
   await send("Input.dispatchMouseEvent", { type: "mouseMoved", ...point, button: "none", buttons: 0 });
   await send("Input.dispatchMouseEvent", { type: "mousePressed", ...point, button: "left", buttons: 1, clickCount: 1 });
   for (const fraction of [0.25, 0.5, 0.75, 1]) {
@@ -73,9 +76,13 @@ async function mouseDrag(side, delta, checkDuringDrag) {
 try {
   await send("Page.enable");
   await send("Runtime.enable");
+  await send("Network.enable");
+  await send("Network.setCacheDisabled", { cacheDisabled: true });
+  await send("Emulation.setTouchEmulationEnabled", { enabled: false });
   await send("Emulation.setDeviceMetricsOverride", { width: 1200, height: 900, deviceScaleFactor: 1, mobile: false });
-  await send("Page.navigate", { url: appUrl });
+  await send("Page.navigate", { url: `${appUrl}?resize-test=${Date.now()}` });
   await waitFor(`document.body.textContent.includes('Choose Image')`);
+  await new Promise((resolve) => setTimeout(resolve, 500));
   await evaluate(`(async () => {
     const canvas = document.createElement('canvas');
     canvas.width = 1600; canvas.height = 1200;
@@ -102,8 +109,9 @@ try {
 
   await evaluate(`document.querySelector('button[aria-label="Set aspect ratio to 1 by 1"]').click()`);
   await waitFor(`Math.abs(document.querySelector('.ratio-viewport').getBoundingClientRect().width / document.querySelector('.ratio-viewport').getBoundingClientRect().height - 1) < 0.005`);
-  await mouseDrag("right", 70, async (live) => {
-    assert.ok(live.ratio > 1.1 && live.width > square.width, `Right handle expands the frame: ${live.ratio}`);
+  await mouseDrag("right", 108, async (live) => {
+    assert.ok(Math.abs(live.ratio - 4 / 3) < 0.04 && live.width > square.width, `Right handle expands to 4:3: ${live.ratio}`);
+    assert.equal(await evaluate(`document.querySelector('button[aria-label="Set aspect ratio to 4 by 3"]').getAttribute('aria-pressed')`), "true");
   });
 
   await evaluate(`document.querySelector('button[aria-label="Set aspect ratio to 1 by 1"]').click()`);

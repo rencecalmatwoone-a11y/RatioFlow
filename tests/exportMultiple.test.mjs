@@ -52,15 +52,15 @@ test("batch export uses the original source sequentially and gives each ratio it
     const files = await exportMultiple(source, RATIOS.map((ratio) => ratio.id), (current, total) => progress.push([current, total]));
 
     assert.deepEqual(files.map((file) => file.name), [
-      "summer-9x16.webp", "summer-1x1.webp", "summer-4x5.webp", "summer-3x2.webp", "summer-16x9.webp",
+      "summer-9x16.webp", "summer-1x1.webp", "summer-4x5.webp", "summer-4x3.webp", "summer-3x2.webp", "summer-16x9.webp",
     ]);
-    assert.deepEqual(progress, [[1, 5], [2, 5], [3, 5], [4, 5], [5, 5]]);
-    assert.equal(decodes, 5);
+    assert.deepEqual(progress, [[1, 6], [2, 6], [3, 6], [4, 6], [5, 6], [6, 6]]);
+    assert.equal(decodes, 6);
     assert.equal(maxActive, 1);
     assert.equal(active, 0);
-    assert.equal(draws.length, 5);
-    assert.deepEqual(encodes, Array.from({ length: 5 }, () => ["image/webp", 0.9]));
-    assert.equal(new Set(draws.map((draw) => `${draw[1]},${draw[2]},${draw[3]},${draw[4]}`)).size, 5);
+    assert.equal(draws.length, 6);
+    assert.deepEqual(encodes, Array.from({ length: 6 }, () => ["image/webp", 0.9]));
+    assert.equal(new Set(draws.map((draw) => `${draw[1]},${draw[2]},${draw[3]},${draw[4]}`)).size, 6);
     for (const [index, file] of files.entries()) {
       assert.equal(file.blob.type, "image/webp");
       const [width, height] = (await file.blob.text()).split("x").map(Number);

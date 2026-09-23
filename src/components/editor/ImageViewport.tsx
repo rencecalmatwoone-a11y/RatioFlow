@@ -164,49 +164,51 @@ export function ImageViewport({ url, name }: ImageViewportProps) {
         aspectRatio: `${ratio.width} / ${ratio.height}`,
       }}
     >
-      <Cropper
-        image={url}
-        crop={crop}
-        onCropChange={handleCropChange}
-        zoom={zoom}
-        minZoom={minZoom}
-        maxZoom={maxZoom}
-        onZoomChange={setZoom}
-        zoomWithScroll={false}
-        aspect={ratio.value}
-        objectFit={viewMode === "fill" ? "cover" : "contain"}
-        restrictPosition
-        showGrid={false}
-        keyboardStep={8}
-        onTouchRequest={(event) => event.touches.length <= 2}
-        onInteractionStart={({ source }) => {
-          interaction.current = true;
-          if (frame.current !== null) cancelAnimationFrame(frame.current);
-          frame.current = null;
-          if (source === "mouse" || source === "touch") setIsDragging(true);
-        }}
-        onInteractionEnd={() => {
-          interaction.current = false;
-          setIsDragging(false);
-          scheduleFocalPoint();
-        }}
-        setMediaSize={(size) => {
-          mediaSize.current = size;
-          scheduleFocalPoint();
-        }}
-        setCropSize={(size) => {
-          cropSize.current = size;
-          scheduleFocalPoint();
-        }}
-        style={{
-          containerStyle: { cursor: isDragging ? "grabbing" : "grab" },
-          cropAreaStyle: { border: 0, boxShadow: "none" },
-        }}
-        classes={{ cropAreaClassName: "ratio-crop-area" }}
-        cropperProps={{ "aria-label": `Reposition ${name}. Use arrow keys to move the image.` }}
-        mediaProps={{ draggable: false }}
-      />
-      {safeZone && <SafeZoneOverlay key={safeZone.presetId} guide={safeZone} visible={showSafeZone} />}
+      <div className="ratio-canvas">
+        <Cropper
+          image={url}
+          crop={crop}
+          onCropChange={handleCropChange}
+          zoom={zoom}
+          minZoom={minZoom}
+          maxZoom={maxZoom}
+          onZoomChange={setZoom}
+          zoomWithScroll={false}
+          aspect={ratio.value}
+          objectFit={viewMode === "fill" ? "cover" : "contain"}
+          restrictPosition
+          showGrid={false}
+          keyboardStep={8}
+          onTouchRequest={(event) => event.touches.length <= 2}
+          onInteractionStart={({ source }) => {
+            interaction.current = true;
+            if (frame.current !== null) cancelAnimationFrame(frame.current);
+            frame.current = null;
+            if (source === "mouse" || source === "touch") setIsDragging(true);
+          }}
+          onInteractionEnd={() => {
+            interaction.current = false;
+            setIsDragging(false);
+            scheduleFocalPoint();
+          }}
+          setMediaSize={(size) => {
+            mediaSize.current = size;
+            scheduleFocalPoint();
+          }}
+          setCropSize={(size) => {
+            cropSize.current = size;
+            scheduleFocalPoint();
+          }}
+          style={{
+            containerStyle: { cursor: isDragging ? "grabbing" : "grab" },
+            cropAreaStyle: { border: 0, boxShadow: "none" },
+          }}
+          classes={{ cropAreaClassName: "ratio-crop-area" }}
+          cropperProps={{ "aria-label": `Reposition ${name}. Use arrow keys to move the image.` }}
+          mediaProps={{ draggable: false }}
+        />
+        {safeZone && <SafeZoneOverlay key={safeZone.presetId} guide={safeZone} visible={showSafeZone} />}
+      </div>
       {(["left", "right"] as const).map((side) => (
         <div
           key={side}

@@ -13,6 +13,7 @@ export const RATIOS = [
   { id: "9:16", name: "Portrait", label: "9:16", width: 9, height: 16, value: 9 / 16 },
   { id: "1:1", name: "Square", label: "1:1", width: 1, height: 1, value: 1 },
   { id: "4:5", name: "Social Portrait", label: "4:5", width: 4, height: 5, value: 4 / 5 },
+  { id: "4:3", name: "Landscape Frame", label: "4:3", width: 4, height: 3, value: 4 / 3 },
   { id: "3:2", name: "Photography", label: "3:2", width: 3, height: 2, value: 3 / 2 },
   { id: "16:9", name: "Landscape", label: "16:9", width: 16, height: 9, value: 16 / 9 },
 ] as const satisfies readonly RatioPreset[];
@@ -24,7 +25,7 @@ export const MIN_RATIO_VALUE = 0.1;
 export const MAX_RATIO_VALUE = 100;
 export const DEFAULT_CUSTOM_RATIO: CustomRatio = { width: 21, height: 9 };
 
-export const DEFAULT_RATIO = RATIOS[4];
+export const DEFAULT_RATIO = RATIOS[5];
 
 /** A small relative tolerance keeps preset feedback stable without moving the frame. */
 export function getMatchingRatioPreset(value: number, tolerance = 0.025): (typeof RATIOS)[number] | undefined {
