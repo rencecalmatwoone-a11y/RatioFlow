@@ -14,6 +14,11 @@ export type CropPosition = {
   y: number;
 };
 
+export type FocalPoint = {
+  x: number;
+  y: number;
+};
+
 export type ViewMode = "fit" | "fill";
 
 export interface EditorState {
@@ -24,6 +29,7 @@ export interface EditorState {
   imageName: string | null;
   selectedRatioId: RatioPresetId;
   crop: CropPosition;
+  focalPoint: FocalPoint;
   zoom: number;
   minZoom: number;
   maxZoom: number;
@@ -34,6 +40,9 @@ export interface EditorState {
   clearImage: () => void;
   setSelectedRatio: (ratioId: RatioPresetId) => void;
   setCrop: (crop: CropPosition) => void;
+  setFocalPoint: (point: FocalPoint) => void;
+  resetPosition: () => void;
+  resetFocalPoint: () => void;
   setZoom: (zoom: number) => void;
   setViewMode: (mode: ViewMode) => void;
   resetZoom: () => void;

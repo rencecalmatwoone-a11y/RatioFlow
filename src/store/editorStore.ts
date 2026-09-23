@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { DEFAULT_RATIO } from "@/lib/ratios";
+import { clampFocalPoint } from "@/lib/focalPoint";
 import type { EditorState } from "@/types/editor";
 
 const MIN_ZOOM = 1;
@@ -7,6 +8,7 @@ const MAX_ZOOM = 3;
 const DEFAULT_ZOOM = MIN_ZOOM;
 const DEFAULT_VIEW_MODE = "fill";
 const CENTER = { x: 0, y: 0 };
+const CENTER_FOCAL = { x: 0.5, y: 0.5 };
 
 export const useEditorStore = create<EditorState>((set) => ({
   imageFile: null,
@@ -16,6 +18,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   imageName: null,
   selectedRatioId: DEFAULT_RATIO.id,
   crop: { x: 0, y: 0 },
+  focalPoint: CENTER_FOCAL,
   zoom: DEFAULT_ZOOM,
   minZoom: MIN_ZOOM,
   maxZoom: MAX_ZOOM,
@@ -26,6 +29,13 @@ export const useEditorStore = create<EditorState>((set) => ({
   setCrop: (crop) => set((state) => ({
     crop,
     ...(state.viewMode === "fill" ? { lastFillCrop: crop } : {}),
+  })),
+  setFocalPoint: (point) => set({ focalPoint: clampFocalPoint(point) }),
+  resetFocalPoint: () => set({ focalPoint: CENTER_FOCAL }),
+  resetPosition: () => set((state) => ({
+    crop: CENTER,
+    focalPoint: CENTER_FOCAL,
+    ...(state.viewMode === "fill" ? { lastFillCrop: CENTER } : {}),
   })),
   setZoom: (zoom) => set((state) => {
     const nextZoom = Number.isFinite(zoom)
@@ -44,8 +54,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   }),
   resetZoom: () => set((state) => ({
     zoom: DEFAULT_ZOOM,
-    crop: CENTER,
-    ...(state.viewMode === "fill" ? { lastFillCrop: CENTER, lastFillZoom: DEFAULT_ZOOM } : {}),
+    ...(state.viewMode === "fill" ? { lastFillZoom: DEFAULT_ZOOM } : {}),
   })),
   setImage: (file, url, width, height) =>
     set((state) => {
@@ -59,6 +68,7 @@ export const useEditorStore = create<EditorState>((set) => ({
         imageHeight: height,
         imageName: file.name,
         crop: { x: 0, y: 0 },
+        focalPoint: CENTER_FOCAL,
         zoom: DEFAULT_ZOOM,
         viewMode: DEFAULT_VIEW_MODE,
         lastFillCrop: CENTER,
@@ -77,6 +87,7 @@ export const useEditorStore = create<EditorState>((set) => ({
         imageHeight: null,
         imageName: null,
         crop: { x: 0, y: 0 },
+        focalPoint: CENTER_FOCAL,
         zoom: DEFAULT_ZOOM,
         viewMode: DEFAULT_VIEW_MODE,
         lastFillCrop: CENTER,
