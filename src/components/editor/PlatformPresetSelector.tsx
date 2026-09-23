@@ -6,12 +6,19 @@ import type { PlatformId } from "@/types/editor";
 
 export function PlatformPresetSelector() {
   const [open, setOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const [platform, setPlatform] = useState<PlatformId>("instagram");
   const container = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const activeId = useEditorStore((state) => state.activePlatformPresetId);
   const selectPreset = useEditorStore((state) => state.setActivePlatformPreset);
   const active = getPlatformPresetById(activeId);
+
+  useEffect(() => {
+    if (!mounted || open) return;
+    const timeout = window.setTimeout(() => setMounted(false), 160);
+    return () => window.clearTimeout(timeout);
+  }, [mounted, open]);
 
   useEffect(() => {
     if (!open) return;
@@ -23,7 +30,16 @@ export function PlatformPresetSelector() {
   }, [open]);
 
   return (
-    <div ref={container} className="relative">
+    <div
+      ref={container}
+      className="relative"
+      onKeyDown={(event) => {
+        if (event.key === "Escape" && open) {
+          setOpen(false);
+          trigger.current?.focus();
+        }
+      }}
+    >
       <button
         ref={trigger}
         type="button"
@@ -31,23 +47,32 @@ export function PlatformPresetSelector() {
         aria-controls="platform-presets"
         onClick={() => {
           if (!open && active) setPlatform(active.platform);
+          if (!open) setMounted(true);
           setOpen(!open);
         }}
         className="inline-flex min-h-11 items-center gap-2 rounded-full border border-[#dededb] bg-white px-4 text-[13px] font-medium text-[#30302f] shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#181818]"
       >
-        Presets <span aria-hidden="true" className="text-[#898984]">⌄</span>
+        <span>Presets</span>
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 10 10"
+          className="h-3 w-3 shrink-0 -translate-y-[1px] text-[#898984]"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M2.2 6.2 5 3.4l2.8 2.8" />
+        </svg>
       </button>
-      {open && (
+      {mounted && (
         <div
           id="platform-presets"
           aria-label="Platform presets"
-          onKeyDown={(event) => {
-            if (event.key === "Escape") {
-              setOpen(false);
-              trigger.current?.focus();
-            }
-          }}
-          className="absolute bottom-full left-1/2 z-30 mb-3 max-h-[min(75vh,32rem)] w-[min(22rem,calc(100vw-2rem))] -translate-x-1/2 overflow-y-auto rounded-2xl border border-[#e6e6e4] bg-white p-3 text-[#242424] shadow-[0_12px_35px_rgba(0,0,0,0.12)]"
+          aria-hidden={!open}
+          inert={!open}
+          className={`absolute bottom-full left-1/2 z-30 mb-3 max-h-[min(75vh,32rem)] w-[min(22rem,calc(100vw-2rem))] -translate-x-1/2 overflow-y-auto rounded-2xl border border-[#e6e6e4] bg-white p-3 text-[#242424] shadow-[0_12px_35px_rgba(0,0,0,0.12)] ${open ? "preset-panel-enter" : "preset-panel-exit"}`}
         >
           <p className="px-1 pb-2 text-xs font-medium">Platform presets</p>
           <div role="group" aria-label="Choose platform" className="grid grid-cols-3 gap-1 rounded-xl bg-[#f2f2f0] p-1">

@@ -20,7 +20,10 @@ export const useEditorStore = create<EditorState>((set) => ({
   imageName: null,
   selectedRatioId: DEFAULT_RATIO.id,
   activePlatformPresetId: null,
+  showSafeZone: false,
   customRatio: DEFAULT_CUSTOM_RATIO,
+  isManualRatio: false,
+  manualFrameWidth: null,
   selectedExportRatios: [DEFAULT_RATIO.id],
   crop: { x: 0, y: 0 },
   focalPoint: CENTER_FOCAL,
@@ -37,21 +40,31 @@ export const useEditorStore = create<EditorState>((set) => ({
   setCustomExportSide: (side, axis) => set((state) => isValidOutputInput(side)
     ? { exportSize: { ...state.exportSize, customSide: side, customAxis: axis } } : state),
   setCustomRatio: (width, height) => set((state) => isValidCustomRatio({ width, height })
-    ? { customRatio: { width, height }, selectedRatioId: "custom", activePlatformPresetId: null,
+    ? { customRatio: { width, height }, selectedRatioId: "custom", activePlatformPresetId: null, isManualRatio: false, manualFrameWidth: null,
       exportSize: state.exportSize.preset === "preset" ? { ...state.exportSize, preset: "original" } : state.exportSize } : state),
+  setManualRatio: (value, frameWidth) => set((state) => Number.isFinite(value) && value >= 0.4 && value <= 4 && Number.isFinite(frameWidth) && frameWidth > 0
+    ? {
+      customRatio: { width: Number(value.toFixed(4)), height: 1 }, selectedRatioId: "custom", isManualRatio: true,
+      manualFrameWidth: frameWidth,
+      activePlatformPresetId: null,
+      exportSize: state.exportSize.preset === "preset" ? { ...state.exportSize, preset: "original" } : state.exportSize,
+    } : state),
   setExportFormat: (format) => set({ exportFormat: format }),
   setExportQuality: (quality) => set((state) => ({
     exportQuality: Number.isFinite(quality) ? Math.min(1, Math.max(0, quality)) : state.exportQuality,
   })),
   setSelectedRatio: (ratioId) => set((state) => ({
     selectedRatioId: ratioId,
+    isManualRatio: false,
+    manualFrameWidth: null,
     activePlatformPresetId: null,
     exportSize: state.exportSize.preset === "preset"
       ? { ...state.exportSize, preset: "original" } : state.exportSize,
   })),
   setActivePlatformPreset: (id) => set((state) => getPlatformPresetById(id)
-    ? { activePlatformPresetId: id, selectedRatioId: "platform", exportSize: { ...state.exportSize, preset: "preset" } }
+    ? { activePlatformPresetId: id, selectedRatioId: "platform", isManualRatio: false, manualFrameWidth: null, exportSize: { ...state.exportSize, preset: "preset" } }
     : state),
+  setShowSafeZone: (show) => set({ showSafeZone: show }),
   toggleExportRatio: (ratioId) => set((state) => ({
     selectedExportRatios: state.selectedExportRatios.includes(ratioId)
       ? state.selectedExportRatios.filter((id) => id !== ratioId)

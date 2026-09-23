@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { downloadFile } from "@/lib/downloadFile";
 import { downloadZip } from "@/lib/downloadZip";
 import { exportMultiple } from "@/lib/exportMultiple";
@@ -12,6 +12,11 @@ export function useImageExport() {
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const inProgress = useRef(false);
+  const feedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (feedbackTimer.current !== null) clearTimeout(feedbackTimer.current);
+  }, []);
 
   async function runExport(ratioIds: readonly RatioId[], currentOnly: boolean) {
     if (inProgress.current) return;
@@ -26,8 +31,10 @@ export function useImageExport() {
     }
 
     inProgress.current = true;
+    if (feedbackTimer.current !== null) clearTimeout(feedbackTimer.current);
     setIsExporting(true);
     setError(null);
+    setStatus(ratioIds.length === 1 ? "Exporting..." : `Exporting 1 of ${ratioIds.length}...`);
     const source = {
       file: state.imageFile,
       imageWidth: state.imageWidth,
@@ -45,11 +52,12 @@ export function useImageExport() {
       multiRatio: !currentOnly && ratioIds.length > 1,
     };
 
+    let downloaded = false;
     try {
       let files;
       try {
         files = await exportMultiple(source, ratioIds, (current, total) => {
-          setStatus(`Exporting ${current} of ${total}...`);
+          setStatus(total === 1 ? "Exporting..." : `Exporting ${current} of ${total}...`);
         });
       } catch {
         setError(currentOnly ? "Could not export this image. Please try again." : "Could not export all selected ratios. Please try again.");
@@ -59,6 +67,8 @@ export function useImageExport() {
       if (files.length === 1) {
         try {
           downloadFile(files[0].blob, files[0].name);
+          downloaded = true;
+          setStatus("Downloaded");
         } catch {
           setError("Could not download this image. Please try again.");
         }
@@ -66,14 +76,19 @@ export function useImageExport() {
         setStatus("Creating ZIP...");
         try {
           await downloadZip(files, exportZipFilename(source.imageName));
+          downloaded = true;
+          setStatus("Downloaded");
         } catch {
           setError("Could not create the ZIP file. Please try again.");
         }
       }
+    } catch {
+      setError("Could not export this image. Please try again.");
     } finally {
       inProgress.current = false;
       setIsExporting(false);
-      setStatus(null);
+      if (downloaded) feedbackTimer.current = setTimeout(() => setStatus(null), 3000);
+      else setStatus(null);
     }
   }
 

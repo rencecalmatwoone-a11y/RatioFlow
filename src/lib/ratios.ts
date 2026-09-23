@@ -26,6 +26,16 @@ export const DEFAULT_CUSTOM_RATIO: CustomRatio = { width: 21, height: 9 };
 
 export const DEFAULT_RATIO = RATIOS[4];
 
+/** A small relative tolerance keeps preset feedback stable without moving the frame. */
+export function getMatchingRatioPreset(value: number, tolerance = 0.025): (typeof RATIOS)[number] | undefined {
+  if (!Number.isFinite(value) || value <= 0) return undefined;
+  return RATIOS.reduce<(typeof RATIOS)[number] | undefined>((closest, preset) => {
+    const distance = Math.abs(value - preset.value) / preset.value;
+    const closestDistance = closest ? Math.abs(value - closest.value) / closest.value : Infinity;
+    return distance <= tolerance && distance < closestDistance ? preset : closest;
+  }, undefined);
+}
+
 export function getRatioPreset(id: RatioPresetId): (typeof RATIOS)[number] {
   return RATIOS.find((ratio) => ratio.id === id) ?? DEFAULT_RATIO;
 }

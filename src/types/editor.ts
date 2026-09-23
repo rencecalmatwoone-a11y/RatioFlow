@@ -24,6 +24,21 @@ export type ViewMode = "fit" | "fill";
 export type ExportFormat = "png" | "jpeg" | "webp";
 export type PlatformId = "instagram" | "tiktok" | "youtube" | "x" | "facebook" | "linkedin";
 export type PlatformPreset = AspectRatio & { id: string; platform: PlatformId; name: string; description?: string; category?: string };
+/** Fractions of the visible crop viewport, each in the range 0–1. */
+export type SafeZoneRegion = {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  label?: string;
+  severity?: "caution" | "blocked";
+};
+export type SafeZonePreset = {
+  presetId: string;
+  zones: readonly SafeZoneRegion[];
+  safeFrame?: SafeZoneRegion;
+};
 export type ExportSizePreset = "original" | "preset" | "1080" | "1440" | "2160" | "custom";
 export type ExportSize = { preset: ExportSizePreset; customSide: number; customAxis: "width" | "height" };
 
@@ -40,7 +55,10 @@ export interface EditorState {
   imageName: string | null;
   selectedRatioId: RatioId;
   activePlatformPresetId: string | null;
+  showSafeZone: boolean;
   customRatio: CustomRatio;
+  isManualRatio: boolean;
+  manualFrameWidth: number | null;
   selectedExportRatios: RatioPresetId[];
   crop: CropPosition;
   focalPoint: FocalPoint;
@@ -57,7 +75,9 @@ export interface EditorState {
   clearImage: () => void;
   setSelectedRatio: (ratioId: RatioPresetId | "custom") => void;
   setActivePlatformPreset: (id: string) => void;
+  setShowSafeZone: (show: boolean) => void;
   setCustomRatio: (width: number, height: number) => void;
+  setManualRatio: (value: number, frameWidth: number) => void;
   setExportSizePreset: (preset: ExportSizePreset) => void;
   setCustomExportSide: (side: number, axis: "width" | "height") => void;
   toggleExportRatio: (ratioId: RatioPresetId) => void;

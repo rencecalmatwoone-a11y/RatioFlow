@@ -134,8 +134,9 @@ export async function exportImage(input: ImageExportInput): Promise<Blob> {
       geometry.sourceX, geometry.sourceY, geometry.sourceWidth, geometry.sourceHeight,
       geometry.destinationX, geometry.destinationY, geometry.destinationWidth, geometry.destinationHeight,
     );
+    const outputCanvas = canvas;
     const blob = await new Promise<Blob>((resolve, reject) => {
-      canvas!.toBlob((result) => result ? resolve(result) : reject(new Error("Image encoding failed")),
+      outputCanvas.toBlob((result) => result ? resolve(result) : reject(new Error("Image encoding failed")),
         mime, input.options.format === "png" ? undefined : input.options.quality);
     });
     if (blob.type.toLowerCase() !== mime) throw new Error(`${input.options.format.toUpperCase()} encoding is unsupported`);

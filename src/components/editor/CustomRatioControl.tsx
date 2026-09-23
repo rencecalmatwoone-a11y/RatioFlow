@@ -36,7 +36,7 @@ export function CustomRatioControl() {
       </div>
       <div className="mt-3 flex items-center justify-between gap-3">
         <span className="text-xs text-[#777]">{customRatio.width}:{customRatio.height}</span>
-        <button type="submit" className="min-h-11 rounded-full bg-[#1e1e1e] px-5 text-xs font-medium text-white">Apply</button>
+        <button type="submit" className="min-h-11 rounded-full bg-[#1e1e1e] px-5 text-xs font-medium text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#181818]">Apply</button>
       </div>
       {error && <p role="alert" className="mt-2 text-xs text-[#a54747]">{error}</p>}
     </form>

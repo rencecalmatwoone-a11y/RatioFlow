@@ -45,7 +45,8 @@ export function UploadArea({ onImage, onError, error, isLoading }: UploadAreaPro
       <button type="button" onClick={open} disabled={isLoading} className="mt-7 min-h-11 rounded-full bg-[#1e1e1e] px-6 text-sm font-medium text-white transition-opacity hover:opacity-85 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#181818] disabled:opacity-70">
         {isLoading ? "Opening image…" : "Choose Image"}
       </button>
-      {error && <p role="alert" className="mt-4 text-sm text-[#a54747]">{error}</p>}
+      {isLoading && <p role="status" className="mt-4 text-sm text-[#62625e]">Preparing image...</p>}
+      {error && <p role="status" className="mt-4 text-sm text-[#a54747]">{error}</p>}
       <p className="mt-7 text-xs text-[#858585]">Processed locally. Your image never leaves your device.</p>
     </section>
   );

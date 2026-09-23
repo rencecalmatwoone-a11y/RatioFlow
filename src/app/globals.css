@@ -4,9 +4,104 @@ body {
   margin: 0;
 }
 
+.preset-panel-enter {
+  animation: preset-panel-in 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  transform-origin: bottom center;
+}
+
+.preset-panel-exit {
+  animation: preset-panel-out 160ms ease-in both;
+  transform-origin: bottom center;
+}
+
+@keyframes preset-panel-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes preset-panel-out {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(6px) scale(0.98); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .preset-panel-enter,
+  .preset-panel-exit {
+    animation: none;
+  }
+}
+
 .ratio-viewport {
-  transition: width 380ms cubic-bezier(0.22, 1, 0.36, 1),
-    aspect-ratio 380ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition: width 260ms cubic-bezier(0.22, 1, 0.36, 1),
+    aspect-ratio 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.ratio-viewport--resizing {
+  transition: none;
+}
+
+.ratio-resize-handle {
+  position: absolute;
+  z-index: 20;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  width: 26px;
+  align-items: center;
+  cursor: ew-resize;
+  touch-action: none;
+  user-select: none;
+}
+
+.ratio-resize-handle--left { left: 0; justify-content: flex-start; }
+.ratio-resize-handle--right { right: 0; justify-content: flex-end; }
+
+.ratio-resize-grip {
+  display: block;
+  width: 4px;
+  height: 42px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 0 0 1px rgba(28, 28, 28, 0.12), 0 1px 5px rgba(0, 0, 0, 0.15);
+  opacity: 0.7;
+  transition: opacity 140ms ease, background-color 140ms ease, box-shadow 140ms ease;
+}
+
+.ratio-resize-handle--left .ratio-resize-grip { margin-left: 2px; }
+.ratio-resize-handle--right .ratio-resize-grip { margin-right: 2px; }
+
+.ratio-resize-handle:hover .ratio-resize-grip,
+.ratio-resize-handle:focus-visible .ratio-resize-grip {
+  background: white;
+  opacity: 1;
+  box-shadow: 0 0 0 1px rgba(28, 28, 28, 0.2), 0 1px 7px rgba(0, 0, 0, 0.24);
+}
+
+.ratio-resize-handle--active .ratio-resize-grip {
+  background: white;
+  opacity: 1;
+  box-shadow: 0 0 0 1px rgba(28, 28, 28, 0.25), 0 1px 10px rgba(0, 0, 0, 0.3);
+}
+
+.ratio-resize-handle:focus-visible { outline: 2px solid white; outline-offset: -5px; }
+
+.ratio-drag-label {
+  position: absolute;
+  z-index: 19;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.88);
+  padding: 4px 9px;
+  color: #30302f;
+  font-size: 11px;
+  font-weight: 500;
+  pointer-events: none;
+}
+
+@media (pointer: coarse) {
+  .ratio-resize-handle { width: 36px; }
 }
 
 .ratio-crop-area:focus-visible {
@@ -20,48 +115,22 @@ body {
   }
 }
 
-.preview-landscape {
-  position: relative;
-  isolation: isolate;
-  background: linear-gradient(180deg, #d5dedc 0%, #e8e7de 54%, #ded5c7 100%);
-}
-
-.preview-sun {
-  position: absolute;
-  top: 18%;
-  left: 56%;
-  width: 17%;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  background: #f4efe2;
-  filter: blur(2px);
-  box-shadow: 0 0 70px 25px rgba(248, 244, 228, 0.48);
-}
-
-.preview-ridge {
-  position: absolute;
-  inset-inline: -6%;
-  bottom: -1%;
-}
-
-.preview-ridge-back {
-  height: 54%;
-  background: #b8bbb0;
-  clip-path: polygon(0 65%, 12% 56%, 24% 62%, 40% 31%, 55% 57%, 70% 30%, 88% 57%, 100% 37%, 100% 100%, 0 100%);
-  filter: blur(1px);
-}
-
-.preview-ridge-front {
-  height: 42%;
-  background: linear-gradient(155deg, #999b8f, #858a80 72%);
-  clip-path: polygon(0 52%, 19% 71%, 38% 42%, 55% 67%, 74% 26%, 100% 66%, 100% 100%, 0 100%);
-}
-
 .zoom-range {
   height: 44px;
   appearance: none;
   background: linear-gradient(#d9d9d6, #d9d9d6) center / 100% 3px no-repeat;
   cursor: pointer;
+}
+
+.fit-fill-selection {
+  transition: left 360ms cubic-bezier(0.22, 1.15, 0.36, 1),
+    width 360ms cubic-bezier(0.22, 1.15, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fit-fill-selection {
+    transition: none;
+  }
 }
 
 .zoom-range::-webkit-slider-thumb {

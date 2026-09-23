@@ -11,6 +11,7 @@ export const IMAGE_ACCEPT = {
 export const IMAGE_ERRORS = {
   type: "Unsupported file type. Use JPEG, PNG, or WebP.",
   size: "Image is too large. Maximum size is 20 MB.",
+  empty: "This image file is empty. Choose another file.",
   decode: "We couldn't read this image. Try another file.",
 };
 
@@ -25,10 +26,16 @@ function decodeWithImage(url: string): Promise<{ width: number; height: number }
 
 async function getDimensions(file: File, url: string) {
   if (typeof createImageBitmap === "function") {
-    const bitmap = await createImageBitmap(file);
-    const dimensions = { width: bitmap.width, height: bitmap.height };
-    bitmap.close();
-    return dimensions;
+    try {
+      const bitmap = await createImageBitmap(file);
+      try {
+        return { width: bitmap.width, height: bitmap.height };
+      } finally {
+        bitmap.close();
+      }
+    } catch {
+      // Some browsers cannot decode every supported image through ImageBitmap.
+    }
   }
   return decodeWithImage(url);
 }
@@ -79,6 +86,10 @@ export function useImage() {
       setError(IMAGE_ERRORS.size);
       return;
     }
+    if (file.size === 0) {
+      setError(IMAGE_ERRORS.empty);
+      return;
+    }
 
     let url: string;
     try {
@@ -92,7 +103,9 @@ export function useImage() {
     try {
       const { width, height } = await getDimensions(file, url);
       if (currentRequest !== requestId.current) return;
-      if (!width || !height) throw new Error("Image has no dimensions");
+      if (![width, height].every((side) => Number.isSafeInteger(side) && side > 0)) {
+        throw new Error("Image has invalid dimensions");
+      }
       setImage(file, url, width, height);
       pendingUrl.current = null;
       setError(null);
