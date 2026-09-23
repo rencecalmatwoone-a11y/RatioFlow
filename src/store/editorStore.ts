@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import { DEFAULT_RATIO, RATIOS } from "@/lib/ratios";
+import { DEFAULT_CUSTOM_RATIO, DEFAULT_RATIO, RATIOS, isValidCustomRatio } from "@/lib/ratios";
+import { isValidOutputInput } from "@/lib/exportDimensions";
 import { clampFocalPoint } from "@/lib/focalPoint";
 import type { EditorState } from "@/types/editor";
 
@@ -17,6 +18,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   imageHeight: null,
   imageName: null,
   selectedRatioId: DEFAULT_RATIO.id,
+  customRatio: DEFAULT_CUSTOM_RATIO,
   selectedExportRatios: [DEFAULT_RATIO.id],
   crop: { x: 0, y: 0 },
   focalPoint: CENTER_FOCAL,
@@ -28,6 +30,12 @@ export const useEditorStore = create<EditorState>((set) => ({
   lastFillZoom: DEFAULT_ZOOM,
   exportFormat: "webp",
   exportQuality: 0.9,
+  exportSize: { preset: "original", customSide: 1920, customAxis: "width" },
+  setExportSizePreset: (preset) => set((state) => ({ exportSize: { ...state.exportSize, preset } })),
+  setCustomExportSide: (side, axis) => set((state) => isValidOutputInput(side)
+    ? { exportSize: { ...state.exportSize, customSide: side, customAxis: axis } } : state),
+  setCustomRatio: (width, height) => set((state) => isValidCustomRatio({ width, height })
+    ? { customRatio: { width, height }, selectedRatioId: "custom" } : state),
   setExportFormat: (format) => set({ exportFormat: format }),
   setExportQuality: (quality) => set((state) => ({
     exportQuality: Number.isFinite(quality) ? Math.min(1, Math.max(0, quality)) : state.exportQuality,
@@ -81,7 +89,7 @@ export const useEditorStore = create<EditorState>((set) => ({
         imageWidth: width,
         imageHeight: height,
         imageName: file.name,
-        selectedExportRatios: [state.selectedRatioId],
+        selectedExportRatios: state.selectedRatioId === "custom" ? [] : [state.selectedRatioId],
         crop: { x: 0, y: 0 },
         focalPoint: CENTER_FOCAL,
         zoom: DEFAULT_ZOOM,
@@ -101,7 +109,7 @@ export const useEditorStore = create<EditorState>((set) => ({
         imageWidth: null,
         imageHeight: null,
         imageName: null,
-        selectedExportRatios: [state.selectedRatioId],
+        selectedExportRatios: state.selectedRatioId === "custom" ? [] : [state.selectedRatioId],
         crop: { x: 0, y: 0 },
         focalPoint: CENTER_FOCAL,
         zoom: DEFAULT_ZOOM,

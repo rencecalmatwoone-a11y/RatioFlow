@@ -3,7 +3,7 @@ import { downloadFile } from "@/lib/downloadFile";
 import { downloadZip } from "@/lib/downloadZip";
 import { exportMultiple } from "@/lib/exportMultiple";
 import { exportZipFilename } from "@/lib/fileName";
-import { RATIOS, type RatioPresetId } from "@/lib/ratios";
+import { RATIOS, type RatioId } from "@/lib/ratios";
 import { useEditorStore } from "@/store/editorStore";
 
 export function useImageExport() {
@@ -12,7 +12,7 @@ export function useImageExport() {
   const [error, setError] = useState<string | null>(null);
   const inProgress = useRef(false);
 
-  async function runExport(ratioIds: readonly RatioPresetId[], currentOnly: boolean) {
+  async function runExport(ratioIds: readonly RatioId[], currentOnly: boolean) {
     if (inProgress.current) return;
     const state = useEditorStore.getState();
     if (!state.imageFile || !state.imageWidth || !state.imageHeight || !state.imageName) {
@@ -36,6 +36,10 @@ export function useImageExport() {
       zoom: state.zoom,
       viewMode: state.viewMode,
       options: { format: state.exportFormat, quality: state.exportQuality },
+      exportSize: state.exportSize,
+      customRatio: state.customRatio,
+      currentRatio: state.selectedRatioId,
+      multiRatio: !currentOnly && ratioIds.length > 1,
     };
 
     try {

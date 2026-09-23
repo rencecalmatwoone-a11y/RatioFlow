@@ -2,7 +2,7 @@
 
 import { useRef, type ChangeEvent } from "react";
 import { IMAGE_ACCEPT, useImage } from "@/hooks/useImage";
-import { getRatioPreset } from "@/lib/ratios";
+import { getActiveRatio } from "@/lib/ratios";
 import { useEditorStore } from "@/store/editorStore";
 import { ExportMenu } from "./ExportMenu";
 import { ImageViewport } from "./ImageViewport";
@@ -20,6 +20,7 @@ export function ImageWorkspace() {
   const imageWidth = useEditorStore((state) => state.imageWidth);
   const imageHeight = useEditorStore((state) => state.imageHeight);
   const selectedRatioId = useEditorStore((state) => state.selectedRatioId);
+  const customRatio = useEditorStore((state) => state.customRatio);
   const resetPosition = useEditorStore((state) => state.resetPosition);
   const { loadImage, clearImage, error, reportError, isLoading } = useImage();
   const replaceInput = useRef<HTMLInputElement>(null);
@@ -42,7 +43,7 @@ export function ImageWorkspace() {
     <section aria-label="Image editor" className="mx-auto w-full max-w-[760px]">
       <div className="mb-4 flex items-center justify-between px-1 text-[11px] font-medium tracking-[0.1em] text-[#858585] uppercase sm:mb-5">
         <span>Preview</span>
-        <span>{getRatioPreset(selectedRatioId).label} frame</span>
+        <span>{getActiveRatio(selectedRatioId, customRatio).label} frame</span>
       </div>
       <ImageViewport url={imageUrl} name={imageName} />
       <div className="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-1 text-xs text-[#858585]">

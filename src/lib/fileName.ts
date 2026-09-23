@@ -1,4 +1,4 @@
-import type { RatioPresetId } from "@/lib/ratios";
+import type { RatioId } from "@/lib/ratios";
 import type { ExportFormat } from "@/types/editor";
 
 export const EXPORT_FORMATS: Record<ExportFormat, { mime: string; extension: string }> = {
@@ -15,8 +15,9 @@ function exportBaseName(imageName: string): string {
     .replace(/[. ]+$/, "") || "image";
 }
 
-export function exportFilename(imageName: string, ratioId: RatioPresetId, format: ExportFormat): string {
-  return `${exportBaseName(imageName)}-${ratioId.replace(":", "x")}.${EXPORT_FORMATS[format].extension}`;
+export function exportFilename(imageName: string, ratioId: RatioId, format: ExportFormat, customLabel?: string): string {
+  const label = ratioId === "custom" ? (customLabel ?? "custom") : ratioId;
+  return `${exportBaseName(imageName)}-${label.replace(":", "x")}.${EXPORT_FORMATS[format].extension}`;
 }
 
 export function exportZipFilename(imageName: string): string {

@@ -1,9 +1,10 @@
 import { EXPORT_FORMATS } from "./fileName.ts";
 export { exportFilename, EXPORT_FORMATS } from "./fileName.ts";
 import type { AspectRatio, ExportOptions, FocalPoint, ViewMode } from "@/types/editor";
+import type { ExportSize } from "@/types/editor";
+import { calculateOutputDimensions } from "./exportDimensions.ts";
 
-export const MAX_EXPORT_DIMENSION = 8192;
-export const MAX_EXPORT_PIXELS = 32_000_000;
+export { MAX_EXPORT_DIMENSION, MAX_EXPORT_PIXELS } from "./exportDimensions.ts";
 
 export type ExportGeometry = {
   sourceX: number;
@@ -27,6 +28,8 @@ export type ImageExportInput = {
   zoom: number;
   viewMode: ViewMode;
   options: ExportOptions;
+  exportSize?: ExportSize;
+  longestSideOverride?: number;
 };
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
@@ -39,6 +42,8 @@ export function calculateExportGeometry(
   focalPoint: FocalPoint,
   zoom: number,
   viewMode: ViewMode,
+  exportSize?: ExportSize,
+  longestSideOverride?: number,
 ): ExportGeometry {
   if (![imageWidth, imageHeight, ratio.width, ratio.height, zoom].every((value) => Number.isFinite(value) && value > 0)) {
     throw new Error("Invalid export dimensions");
@@ -48,16 +53,7 @@ export function calculateExportGeometry(
   const sourceScale = viewMode === "fill" ? baseScale / zoom : baseScale;
   const sourceWidth = viewMode === "fill" ? sourceScale * ratio.width : imageWidth;
   const sourceHeight = viewMode === "fill" ? sourceScale * ratio.height : imageHeight;
-  const maxScale = Math.min(
-    sourceScale,
-    MAX_EXPORT_DIMENSION / Math.max(ratio.width, ratio.height),
-    Math.sqrt(MAX_EXPORT_PIXELS / (ratio.width * ratio.height)),
-  );
-  const outputScale = Math.floor(maxScale);
-  if (outputScale < 1) throw new Error("Image is too small for this ratio");
-
-  const outputWidth = outputScale * ratio.width;
-  const outputHeight = outputScale * ratio.height;
+  const { width: outputWidth, height: outputHeight } = calculateOutputDimensions(sourceScale, ratio, exportSize, longestSideOverride);
   const sourceX = viewMode === "fill"
     ? clamp((Number.isFinite(focalPoint.x) ? focalPoint.x : 0.5) * imageWidth - sourceWidth / 2, 0, imageWidth - sourceWidth)
     : 0;
@@ -111,7 +107,7 @@ async function decodeOriginal(file: File): Promise<{ image: CanvasImageSource; c
 
 export async function exportImage(input: ImageExportInput): Promise<Blob> {
   const geometry = calculateExportGeometry(
-    input.imageWidth, input.imageHeight, input.ratio, input.focalPoint, input.zoom, input.viewMode,
+    input.imageWidth, input.imageHeight, input.ratio, input.focalPoint, input.zoom, input.viewMode, input.exportSize, input.longestSideOverride,
   );
   const { mime } = EXPORT_FORMATS[input.options.format];
   const decoded = await decodeOriginal(input.file);

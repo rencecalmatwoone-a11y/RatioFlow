@@ -1,4 +1,4 @@
-import type { RatioPresetId } from "@/lib/ratios";
+import type { CustomRatio, RatioId, RatioPresetId } from "@/lib/ratios";
 
 export interface AspectRatio {
   width: number;
@@ -22,6 +22,8 @@ export type FocalPoint = {
 export type ViewMode = "fit" | "fill";
 
 export type ExportFormat = "png" | "jpeg" | "webp";
+export type ExportSizePreset = "original" | "1080" | "1440" | "2160" | "custom";
+export type ExportSize = { preset: ExportSizePreset; customSide: number; customAxis: "width" | "height" };
 
 export type ExportOptions = {
   format: ExportFormat;
@@ -34,7 +36,8 @@ export interface EditorState {
   imageWidth: number | null;
   imageHeight: number | null;
   imageName: string | null;
-  selectedRatioId: RatioPresetId;
+  selectedRatioId: RatioId;
+  customRatio: CustomRatio;
   selectedExportRatios: RatioPresetId[];
   crop: CropPosition;
   focalPoint: FocalPoint;
@@ -46,9 +49,13 @@ export interface EditorState {
   lastFillZoom: number;
   exportFormat: ExportFormat;
   exportQuality: number;
+  exportSize: ExportSize;
   setImage: (file: File, url: string, width: number, height: number) => void;
   clearImage: () => void;
-  setSelectedRatio: (ratioId: RatioPresetId) => void;
+  setSelectedRatio: (ratioId: RatioId) => void;
+  setCustomRatio: (width: number, height: number) => void;
+  setExportSizePreset: (preset: ExportSizePreset) => void;
+  setCustomExportSide: (side: number, axis: "width" | "height") => void;
   toggleExportRatio: (ratioId: RatioPresetId) => void;
   selectAllExportRatios: () => void;
   clearExportRatios: () => void;

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import Cropper from "react-easy-crop";
 import { cropToFocalPoint, focalPointToCrop, type CropGeometry } from "@/lib/focalPoint";
-import { getRatioPreset } from "@/lib/ratios";
+import { getActiveRatio } from "@/lib/ratios";
 import { useEditorStore } from "@/store/editorStore";
 import type { CropPosition } from "@/types/editor";
 
@@ -12,6 +12,7 @@ interface ImageViewportProps {
 
 export function ImageViewport({ url, name }: ImageViewportProps) {
   const selectedRatioId = useEditorStore((state) => state.selectedRatioId);
+  const customRatio = useEditorStore((state) => state.customRatio);
   const crop = useEditorStore((state) => state.crop);
   const setCrop = useEditorStore((state) => state.setCrop);
   const focalPoint = useEditorStore((state) => state.focalPoint);
@@ -26,7 +27,7 @@ export function ImageViewport({ url, name }: ImageViewportProps) {
   const cropSize = useRef<{ width: number; height: number } | null>(null);
   const interaction = useRef(false);
   const frame = useRef<number | null>(null);
-  const ratio = getRatioPreset(selectedRatioId);
+  const ratio = getActiveRatio(selectedRatioId, customRatio);
 
   const applyFocalPoint = useCallback(() => {
     if (interaction.current || !mediaSize.current || !cropSize.current) return;
@@ -58,7 +59,7 @@ export function ImageViewport({ url, name }: ImageViewportProps) {
     // Reuse the last measured geometry immediately; the cropper reports new sizes as the frame animates.
     applyFocalPoint();
     scheduleFocalPoint();
-  }, [selectedRatioId, zoom, viewMode, focalPoint, applyFocalPoint, scheduleFocalPoint]);
+  }, [selectedRatioId, customRatio, zoom, viewMode, focalPoint, applyFocalPoint, scheduleFocalPoint]);
 
   useEffect(() => () => {
     if (frame.current !== null) cancelAnimationFrame(frame.current);

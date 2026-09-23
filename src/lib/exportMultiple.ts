@@ -1,23 +1,28 @@
 import { exportImage, type ImageExportInput } from "./exportImage.ts";
 import { exportFilename } from "./fileName.ts";
-import { getRatioPreset, type RatioPresetId } from "./ratios.ts";
+import { DEFAULT_CUSTOM_RATIO, getActiveRatio, type CustomRatio, type RatioId } from "./ratios.ts";
+import { requestedLongestSide } from "./exportDimensions.ts";
 
 export type GeneratedExport = { name: string; blob: Blob };
 
 export async function exportMultiple(
-  input: Omit<ImageExportInput, "ratio"> & { imageName: string },
-  ratioIds: readonly RatioPresetId[],
+  input: Omit<ImageExportInput, "ratio"> & { imageName: string; customRatio?: CustomRatio; multiRatio?: boolean; currentRatio?: RatioId },
+  ratioIds: readonly RatioId[],
   onProgress?: (current: number, total: number) => void,
 ): Promise<GeneratedExport[]> {
   const files: GeneratedExport[] = [];
-  const { imageName, ...source } = input;
+  const { imageName, customRatio = DEFAULT_CUSTOM_RATIO, multiRatio, currentRatio, ...source } = input;
+  const longestSideOverride = multiRatio && source.exportSize?.preset === "custom"
+    ? requestedLongestSide(getActiveRatio(currentRatio ?? ratioIds[0], customRatio), source.exportSize) ?? undefined
+    : undefined;
 
   for (const [index, ratioId] of ratioIds.entries()) {
     onProgress?.(index + 1, ratioIds.length);
     // Give the browser a chance to paint progress before decoding and drawing.
     await new Promise<void>((resolve) => setTimeout(resolve, 0));
-    const blob = await exportImage({ ...source, ratio: getRatioPreset(ratioId) });
-    files.push({ name: exportFilename(imageName, ratioId, source.options.format), blob });
+    const ratio = getActiveRatio(ratioId, customRatio);
+    const blob = await exportImage({ ...source, ratio, longestSideOverride });
+    files.push({ name: exportFilename(imageName, ratioId, source.options.format, ratio.label), blob });
   }
 
   return files;

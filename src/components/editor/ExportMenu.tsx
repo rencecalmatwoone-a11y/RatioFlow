@@ -3,6 +3,7 @@ import { useImageExport } from "@/hooks/useImageExport";
 import { RATIOS } from "@/lib/ratios";
 import { useEditorStore } from "@/store/editorStore";
 import type { ExportFormat } from "@/types/editor";
+import { OutputSizeControl } from "./OutputSizeControl";
 
 const formats: { value: ExportFormat; label: string }[] = [
   { value: "png", label: "PNG" },
@@ -12,6 +13,7 @@ const formats: { value: ExportFormat; label: string }[] = [
 
 export function ExportMenu() {
   const [isOpen, setIsOpen] = useState(false);
+  const [sizeValid, setSizeValid] = useState(true);
   const container = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const exportFormat = useEditorStore((state) => state.exportFormat);
@@ -41,7 +43,7 @@ export function ExportMenu() {
         aria-expanded={isOpen}
         aria-controls="export-options"
         onClick={() => {
-          if (!isOpen) clearError();
+          if (!isOpen) { clearError(); setSizeValid(true); }
           setIsOpen(!isOpen);
         }}
         className="inline-flex min-h-11 items-center justify-center gap-3 rounded-full bg-[#1e1e1e] px-5 text-[13px] font-medium text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#181818]"
@@ -88,6 +90,7 @@ export function ExportMenu() {
               />
             </div>
           )}
+          <OutputSizeControl onValidityChange={setSizeValid} />
           <fieldset className="mt-4 border-t border-[#ececea] pt-3">
             <legend className="sr-only">Export ratios</legend>
             <div className="flex items-center justify-between gap-2">
@@ -114,7 +117,7 @@ export function ExportMenu() {
           <button
             type="button"
             onClick={() => void downloadCurrent()}
-            disabled={isExporting}
+            disabled={isExporting || !sizeValid}
             className="mt-4 min-h-11 w-full rounded-full bg-[#1e1e1e] px-4 text-sm font-medium text-white disabled:cursor-wait disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#181818]"
           >
             Download Current
@@ -122,7 +125,7 @@ export function ExportMenu() {
           <button
             type="button"
             onClick={() => void downloadSelected()}
-            disabled={isExporting || selectedExportRatios.length === 0}
+            disabled={isExporting || !sizeValid || selectedExportRatios.length === 0}
             className="mt-2 min-h-11 w-full rounded-full border border-[#dededb] px-4 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#181818]"
           >
             Download Selected
@@ -130,7 +133,7 @@ export function ExportMenu() {
           <button
             type="button"
             onClick={() => void downloadAll()}
-            disabled={isExporting}
+            disabled={isExporting || !sizeValid}
             className="mt-2 min-h-11 w-full rounded-full border border-[#dededb] px-4 text-sm font-medium disabled:cursor-wait disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#181818]"
           >
             Download All
