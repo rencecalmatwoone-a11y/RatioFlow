@@ -5,6 +5,9 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "RatioFlow — Instant Image Ratio Converter",
   description: "Crop and export images into multiple aspect ratios directly in your browser.",
+  icons: {
+    icon: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
