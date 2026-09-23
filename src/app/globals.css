@@ -1,0 +1,73 @@
+@import "tailwindcss";
+
+body {
+  margin: 0;
+}
+
+.preview-landscape {
+  position: relative;
+  isolation: isolate;
+  background: linear-gradient(180deg, #d5dedc 0%, #e8e7de 54%, #ded5c7 100%);
+}
+
+.preview-sun {
+  position: absolute;
+  top: 18%;
+  left: 56%;
+  width: 17%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: #f4efe2;
+  filter: blur(2px);
+  box-shadow: 0 0 70px 25px rgba(248, 244, 228, 0.48);
+}
+
+.preview-ridge {
+  position: absolute;
+  inset-inline: -6%;
+  bottom: -1%;
+}
+
+.preview-ridge-back {
+  height: 54%;
+  background: #b8bbb0;
+  clip-path: polygon(0 65%, 12% 56%, 24% 62%, 40% 31%, 55% 57%, 70% 30%, 88% 57%, 100% 37%, 100% 100%, 0 100%);
+  filter: blur(1px);
+}
+
+.preview-ridge-front {
+  height: 42%;
+  background: linear-gradient(155deg, #999b8f, #858a80 72%);
+  clip-path: polygon(0 52%, 19% 71%, 38% 42%, 55% 67%, 74% 26%, 100% 66%, 100% 100%, 0 100%);
+}
+
+.zoom-range {
+  height: 44px;
+  appearance: none;
+  background: linear-gradient(#d9d9d6, #d9d9d6) center / 100% 3px no-repeat;
+  cursor: pointer;
+}
+
+.zoom-range::-webkit-slider-thumb {
+  width: 13px;
+  height: 13px;
+  appearance: none;
+  border: 3px solid white;
+  border-radius: 50%;
+  background: #30302f;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+}
+
+.zoom-range::-moz-range-thumb {
+  width: 8px;
+  height: 8px;
+  border: 3px solid white;
+  border-radius: 50%;
+  background: #30302f;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+}
+
+.zoom-range:focus-visible {
+  outline: 2px solid #181818;
+  outline-offset: 6px;
+}
