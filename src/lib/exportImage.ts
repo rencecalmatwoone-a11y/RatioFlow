@@ -1,1 +1,166 @@
-export {};
+import type { RatioPresetId } from "@/lib/ratios";
+import type { AspectRatio, ExportFormat, ExportOptions, FocalPoint, ViewMode } from "@/types/editor";
+
+export const MAX_EXPORT_DIMENSION = 8192;
+export const MAX_EXPORT_PIXELS = 32_000_000;
+
+export const EXPORT_FORMATS: Record<ExportFormat, { mime: string; extension: string }> = {
+  png: { mime: "image/png", extension: "png" },
+  jpeg: { mime: "image/jpeg", extension: "jpg" },
+  webp: { mime: "image/webp", extension: "webp" },
+};
+
+export function exportFilename(imageName: string, ratioId: RatioPresetId, format: ExportFormat): string {
+  const base = imageName
+    .replace(/\.[^.]+$/, "")
+    .replace(/[<>:"/\\|?*\x00-\x1f]/g, "-")
+    .trim()
+    .replace(/[. ]+$/, "") || "image";
+  return `${base}-${ratioId.replace(":", "x")}.${EXPORT_FORMATS[format].extension}`;
+}
+
+export type ExportGeometry = {
+  sourceX: number;
+  sourceY: number;
+  sourceWidth: number;
+  sourceHeight: number;
+  outputWidth: number;
+  outputHeight: number;
+  destinationX: number;
+  destinationY: number;
+  destinationWidth: number;
+  destinationHeight: number;
+};
+
+export type ImageExportInput = {
+  file: File;
+  imageWidth: number;
+  imageHeight: number;
+  ratio: AspectRatio;
+  focalPoint: FocalPoint;
+  zoom: number;
+  viewMode: ViewMode;
+  options: ExportOptions;
+};
+
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+
+/** Geometry is expressed in original-image pixels, independent of preview size. */
+export function calculateExportGeometry(
+  imageWidth: number,
+  imageHeight: number,
+  ratio: AspectRatio,
+  focalPoint: FocalPoint,
+  zoom: number,
+  viewMode: ViewMode,
+): ExportGeometry {
+  if (![imageWidth, imageHeight, ratio.width, ratio.height, zoom].every((value) => Number.isFinite(value) && value > 0)) {
+    throw new Error("Invalid export dimensions");
+  }
+
+  const baseScale = Math.min(imageWidth / ratio.width, imageHeight / ratio.height);
+  const sourceScale = viewMode === "fill" ? baseScale / zoom : baseScale;
+  const sourceWidth = viewMode === "fill" ? sourceScale * ratio.width : imageWidth;
+  const sourceHeight = viewMode === "fill" ? sourceScale * ratio.height : imageHeight;
+  const maxScale = Math.min(
+    sourceScale,
+    MAX_EXPORT_DIMENSION / Math.max(ratio.width, ratio.height),
+    Math.sqrt(MAX_EXPORT_PIXELS / (ratio.width * ratio.height)),
+  );
+  const outputScale = Math.floor(maxScale);
+  if (outputScale < 1) throw new Error("Image is too small for this ratio");
+
+  const outputWidth = outputScale * ratio.width;
+  const outputHeight = outputScale * ratio.height;
+  const sourceX = viewMode === "fill"
+    ? clamp((Number.isFinite(focalPoint.x) ? focalPoint.x : 0.5) * imageWidth - sourceWidth / 2, 0, imageWidth - sourceWidth)
+    : 0;
+  const sourceY = viewMode === "fill"
+    ? clamp((Number.isFinite(focalPoint.y) ? focalPoint.y : 0.5) * imageHeight - sourceHeight / 2, 0, imageHeight - sourceHeight)
+    : 0;
+
+  if (viewMode === "fill") {
+    return {
+      sourceX, sourceY, sourceWidth, sourceHeight, outputWidth, outputHeight,
+      destinationX: 0, destinationY: 0,
+      destinationWidth: outputWidth, destinationHeight: outputHeight,
+    };
+  }
+
+  const fittedScale = Math.min(outputWidth / imageWidth, outputHeight / imageHeight);
+  const destinationWidth = imageWidth * fittedScale;
+  const destinationHeight = imageHeight * fittedScale;
+  return {
+    sourceX, sourceY, sourceWidth, sourceHeight, outputWidth, outputHeight,
+    destinationX: (outputWidth - destinationWidth) / 2,
+    destinationY: (outputHeight - destinationHeight) / 2,
+    destinationWidth, destinationHeight,
+  };
+}
+
+async function decodeOriginal(file: File): Promise<{ image: CanvasImageSource; close: () => void }> {
+  if (typeof createImageBitmap === "function") {
+    try {
+      const bitmap = await createImageBitmap(file);
+      return { image: bitmap, close: () => bitmap.close() };
+    } catch {
+      // HTMLImageElement supports browsers where ImageBitmap decoding is unavailable.
+    }
+  }
+
+  const url = URL.createObjectURL(file);
+  try {
+    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const element = new Image();
+      element.onload = () => resolve(element);
+      element.onerror = () => reject(new Error("Image decoding failed"));
+      element.src = url;
+    });
+    return { image, close: () => URL.revokeObjectURL(url) };
+  } catch (error) {
+    URL.revokeObjectURL(url);
+    throw error;
+  }
+}
+
+export async function exportImage(input: ImageExportInput): Promise<Blob> {
+  const geometry = calculateExportGeometry(
+    input.imageWidth, input.imageHeight, input.ratio, input.focalPoint, input.zoom, input.viewMode,
+  );
+  const { mime } = EXPORT_FORMATS[input.options.format];
+  const decoded = await decodeOriginal(input.file);
+  let canvas: HTMLCanvasElement | null = null;
+
+  try {
+    canvas = document.createElement("canvas");
+    canvas.width = geometry.outputWidth;
+    canvas.height = geometry.outputHeight;
+    if (canvas.width !== geometry.outputWidth || canvas.height !== geometry.outputHeight) {
+      throw new Error("Canvas dimensions are unsupported");
+    }
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Canvas context unavailable");
+    if (input.options.format === "jpeg") {
+      context.fillStyle = "#FFFFFF";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+    }
+    context.imageSmoothingQuality = "high";
+    context.drawImage(
+      decoded.image,
+      geometry.sourceX, geometry.sourceY, geometry.sourceWidth, geometry.sourceHeight,
+      geometry.destinationX, geometry.destinationY, geometry.destinationWidth, geometry.destinationHeight,
+    );
+    const blob = await new Promise<Blob>((resolve, reject) => {
+      canvas!.toBlob((result) => result ? resolve(result) : reject(new Error("Image encoding failed")),
+        mime, input.options.format === "png" ? undefined : input.options.quality);
+    });
+    if (blob.type.toLowerCase() !== mime) throw new Error(`${input.options.format.toUpperCase()} encoding is unsupported`);
+    return blob;
+  } finally {
+    if (canvas) {
+      canvas.width = 0;
+      canvas.height = 0;
+    }
+    decoded.close();
+  }
+}

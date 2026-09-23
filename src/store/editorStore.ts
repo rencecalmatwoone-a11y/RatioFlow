@@ -25,6 +25,12 @@ export const useEditorStore = create<EditorState>((set) => ({
   viewMode: DEFAULT_VIEW_MODE,
   lastFillCrop: CENTER,
   lastFillZoom: DEFAULT_ZOOM,
+  exportFormat: "webp",
+  exportQuality: 0.9,
+  setExportFormat: (format) => set({ exportFormat: format }),
+  setExportQuality: (quality) => set((state) => ({
+    exportQuality: Number.isFinite(quality) ? Math.min(1, Math.max(0, quality)) : state.exportQuality,
+  })),
   setSelectedRatio: (ratioId) => set({ selectedRatioId: ratioId }),
   setCrop: (crop) => set((state) => ({
     crop,

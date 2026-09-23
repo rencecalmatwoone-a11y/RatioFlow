@@ -21,6 +21,13 @@ export type FocalPoint = {
 
 export type ViewMode = "fit" | "fill";
 
+export type ExportFormat = "png" | "jpeg" | "webp";
+
+export type ExportOptions = {
+  format: ExportFormat;
+  quality: number;
+};
+
 export interface EditorState {
   imageFile: File | null;
   imageUrl: string | null;
@@ -36,6 +43,8 @@ export interface EditorState {
   viewMode: ViewMode;
   lastFillCrop: CropPosition;
   lastFillZoom: number;
+  exportFormat: ExportFormat;
+  exportQuality: number;
   setImage: (file: File, url: string, width: number, height: number) => void;
   clearImage: () => void;
   setSelectedRatio: (ratioId: RatioPresetId) => void;
@@ -46,4 +55,6 @@ export interface EditorState {
   setZoom: (zoom: number) => void;
   setViewMode: (mode: ViewMode) => void;
   resetZoom: () => void;
+  setExportFormat: (format: ExportFormat) => void;
+  setExportQuality: (quality: number) => void;
 }
