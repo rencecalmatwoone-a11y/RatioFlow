@@ -52,8 +52,9 @@ try {
   await send("Page.enable");
   await send("Runtime.enable");
   await send("Page.setDownloadBehavior", { behavior: "deny" });
+  await send("Emulation.setDeviceMetricsOverride", { width: 1200, height: 900, deviceScaleFactor: 1, mobile: false });
   await send("Page.navigate", { url: appUrl });
-  await waitFor(`document.body.textContent.includes('Choose Image')`);
+  await waitFor(`document.body?.textContent.includes('Choose Image')`);
   await evaluate(`(async () => {
     const canvas = document.createElement('canvas');
     canvas.width = 1600; canvas.height = 1200;
@@ -78,9 +79,31 @@ try {
   assertSelected(await checkedRatios(), ["1:1", "4:5"]);
   await evaluate(`document.querySelector('button[aria-label="Set aspect ratio to 3 by 2"]').click()`);
   assertSelected(await checkedRatios(), ["3:2"]);
+  await waitFor(`Math.abs(document.querySelector('.ratio-viewport').getBoundingClientRect().width / document.querySelector('.ratio-viewport').getBoundingClientRect().height - 1.5) < 0.005`);
 
-  await evaluate(`document.querySelector('button[aria-label^="Set custom aspect ratio"]').click()`);
-  assertSelected(await checkedRatios(), ["Custom · 21:9"]);
+  const drag = await evaluate(`(() => {
+    const viewport = document.querySelector('.ratio-viewport');
+    viewport.scrollIntoView({ block: 'center' });
+    const frame = viewport.getBoundingClientRect();
+    const handle = document.querySelector('.ratio-resize-handle--right').getBoundingClientRect();
+    return { x: Math.round(handle.left + handle.width / 2), y: Math.round(handle.top + handle.height / 2),
+      delta: Math.round((frame.height - frame.width) / 2) };
+  })()`);
+  await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: drag.x, y: drag.y, button: "none", buttons: 0 });
+  await send("Input.dispatchMouseEvent", { type: "mousePressed", x: drag.x, y: drag.y, button: "left", buttons: 1, clickCount: 1 });
+  for (const fraction of [0.25, 0.5, 0.75, 1]) {
+    await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: drag.x + drag.delta * fraction, y: drag.y, button: "left", buttons: 1 });
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  await send("Input.dispatchMouseEvent", { type: "mouseReleased", x: drag.x + drag.delta, y: drag.y, button: "left", buttons: 0, clickCount: 1 });
+  await waitFor(`!document.querySelector('#export-options')`);
+  await evaluate(`Array.from(document.querySelectorAll('button')).find(button => button.textContent.trim() === 'Export').click()`);
+  await waitFor(`!!document.querySelector('#export-options')`);
+  await waitFor(`Array.from(document.querySelectorAll('#export-options label')).some(label => label.textContent.trim() === '1:1' && label.querySelector('input:checked'))`);
+  assertSelected(await checkedRatios(), ["1:1"]);
+  if (await evaluate(`Array.from(document.querySelectorAll('#export-options label')).some(label => label.textContent.trim().startsWith('Custom'))`)) {
+    throw new Error("A matched drag still shows a custom export ratio");
+  }
   await evaluate(`(() => {
     window.__ratioExports = [];
     const create = URL.createObjectURL.bind(URL);
@@ -88,8 +111,35 @@ try {
     Array.from(document.querySelectorAll('#export-options button')).find(button => button.textContent.includes('Download Selected')).click();
   })()`);
   await waitFor(`window.__ratioExports.length === 1`);
-  const customRatio = await evaluate(`(async () => { const image = await createImageBitmap(window.__ratioExports[0]); const value = image.width / image.height; image.close(); return value; })()`);
-  if (Math.abs(customRatio - 21 / 9) > 0.01) throw new Error(`Custom export ratio was ${customRatio}`);
+  await waitFor(`!Array.from(document.querySelectorAll('#export-options button')).find(button => button.textContent.includes('Download Current')).disabled`);
+  await evaluate(`Array.from(document.querySelectorAll('#export-options button')).find(button => button.textContent.includes('Download Current')).click()`);
+  await waitFor(`window.__ratioExports.length === 2`);
+  const squareSizes = await evaluate(`(async () => Promise.all(window.__ratioExports.slice(0, 2).map(async blob => {
+    const image = await createImageBitmap(blob); const size = [image.width, image.height]; image.close(); return size;
+  })))()`);
+  if (squareSizes.some(([width, height]) => width !== height)) throw new Error(`Matched drag exported nonsquare images: ${JSON.stringify(squareSizes)}`);
+
+  const customHandle = await evaluate(`(() => {
+    const viewport = document.querySelector('.ratio-viewport');
+    viewport.scrollIntoView({ block: 'center' });
+    const rect = document.querySelector('.ratio-resize-handle--right').getBoundingClientRect();
+    return { x: Math.round(rect.left + rect.width / 2), y: Math.round(rect.top + rect.height / 2) };
+  })()`);
+  await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: customHandle.x, y: customHandle.y, button: "none", buttons: 0 });
+  await send("Input.dispatchMouseEvent", { type: "mousePressed", x: customHandle.x, y: customHandle.y, button: "left", buttons: 1, clickCount: 1 });
+  await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: customHandle.x + 55, y: customHandle.y, button: "left", buttons: 1 });
+  await new Promise((resolve) => setTimeout(resolve, 40));
+  await send("Input.dispatchMouseEvent", { type: "mouseReleased", x: customHandle.x + 55, y: customHandle.y, button: "left", buttons: 0, clickCount: 1 });
+  await waitFor(`!document.querySelector('#export-options')`);
+  await evaluate(`Array.from(document.querySelectorAll('button')).find(button => button.textContent.trim() === 'Export').click()`);
+  await waitFor(`!!document.querySelector('#export-options')`);
+  const customSelection = await checkedRatios();
+  if (customSelection.length !== 1 || !customSelection[0].startsWith("Custom · ")) throw new Error(`Unexpected custom selection: ${customSelection}`);
+  const customFrameRatio = await evaluate(`(() => { const rect = document.querySelector('.ratio-viewport').getBoundingClientRect(); return rect.width / rect.height; })()`);
+  await evaluate(`Array.from(document.querySelectorAll('#export-options button')).find(button => button.textContent.includes('Download Selected')).click()`);
+  await waitFor(`window.__ratioExports.length === 3`);
+  const customRatio = await evaluate(`(async () => { const image = await createImageBitmap(window.__ratioExports[2]); const value = image.width / image.height; image.close(); return value; })()`);
+  if (Math.abs(customRatio - customFrameRatio) > 0.01) throw new Error(`Custom export ratio ${customRatio} differed from frame ${customFrameRatio}`);
 
   await evaluate(`Array.from(document.querySelectorAll('button')).find(button => button.textContent.includes('Presets')).click()`);
   await waitFor(`!!document.querySelector('#platform-presets')`);
@@ -97,10 +147,10 @@ try {
   await evaluate(`Array.from(document.querySelectorAll('#platform-presets button')).find(button => button.textContent.includes('Thumbnail')).click()`);
   assertSelected(await checkedRatios(), ["YouTube · Thumbnail (16:9)"]);
   await evaluate(`Array.from(document.querySelectorAll('#export-options button')).find(button => button.textContent.includes('Download Selected')).click()`);
-  await waitFor(`window.__ratioExports.length === 2`);
-  const platformSize = await evaluate(`(async () => { const image = await createImageBitmap(window.__ratioExports[1]); const size = [image.width, image.height]; image.close(); return size; })()`);
+  await waitFor(`window.__ratioExports.length === 4`);
+  const platformSize = await evaluate(`(async () => { const image = await createImageBitmap(window.__ratioExports[3]); const size = [image.width, image.height]; image.close(); return size; })()`);
   if (Math.abs(platformSize[0] / platformSize[1] - 16 / 9) > 0.01) throw new Error(`Platform export dimensions were ${platformSize}`);
-  console.log("Preset, custom, and platform ratios stay in sync with export selection and downloaded images.");
+  console.log("Preset, dragged, custom, and platform ratios stay in sync with export selection and downloaded images.");
 } finally {
   socket.close();
 }

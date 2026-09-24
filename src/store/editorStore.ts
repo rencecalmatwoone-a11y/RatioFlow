@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { DEFAULT_CUSTOM_RATIO, DEFAULT_RATIO, RATIOS, isValidCustomRatio } from "@/lib/ratios";
+import { DEFAULT_CUSTOM_RATIO, DEFAULT_RATIO, RATIOS, getMatchingRatioPreset, isValidCustomRatio } from "@/lib/ratios";
 import { isValidOutputInput } from "@/lib/exportDimensions";
 import { clampFocalPoint } from "@/lib/focalPoint";
 import { getPlatformPresetById } from "@/constants/platformPresets";
@@ -43,14 +43,22 @@ export const useEditorStore = create<EditorState>((set) => ({
     ? { customRatio: { width, height }, selectedRatioId: "custom", activePlatformPresetId: null, isManualRatio: false, manualFrameWidth: null,
       selectedExportRatios: ["custom"],
       exportSize: state.exportSize.preset === "preset" ? { ...state.exportSize, preset: "original" } : state.exportSize } : state),
-  setManualRatio: (value, frameWidth) => set((state) => Number.isFinite(value) && value >= 0.4 && value <= 4 && Number.isFinite(frameWidth) && frameWidth > 0
-    ? {
-      customRatio: { width: Number(value.toFixed(4)), height: 1 }, selectedRatioId: "custom", isManualRatio: true,
+  setManualRatio: (value, frameWidth) => set((state) => {
+    if (!Number.isFinite(value) || value < 0.4 || value > 4 || !Number.isFinite(frameWidth) || frameWidth <= 0) return state;
+    const matchedPreset = getMatchingRatioPreset(value);
+    const ratioId = matchedPreset?.id ?? "custom";
+    return {
+      customRatio: matchedPreset
+        ? { width: matchedPreset.width, height: matchedPreset.height }
+        : { width: Number(value.toFixed(4)), height: 1 },
+      selectedRatioId: ratioId,
+      isManualRatio: true,
       manualFrameWidth: frameWidth,
       activePlatformPresetId: null,
-      selectedExportRatios: ["custom"],
+      selectedExportRatios: [ratioId],
       exportSize: state.exportSize.preset === "preset" ? { ...state.exportSize, preset: "original" } : state.exportSize,
-    } : state),
+    };
+  }),
   setExportFormat: (format) => set({ exportFormat: format }),
   setExportQuality: (quality) => set((state) => ({
     exportQuality: Number.isFinite(quality) ? Math.min(1, Math.max(0, quality)) : state.exportQuality,
