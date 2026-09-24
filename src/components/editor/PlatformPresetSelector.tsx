@@ -93,7 +93,7 @@ export function PlatformPresetSelector() {
                 type="button"
                 aria-pressed={activeId === preset.id}
                 onClick={() => { selectPreset(preset.id); setOpen(false); trigger.current?.focus(); }}
-                className={`flex min-h-14 w-full items-center gap-3 rounded-xl px-3 py-2 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#181818] ${activeId === preset.id ? "bg-[#eeeeeb]" : "hover:bg-[#f7f7f5]"}`}
+                className={`flex min-h-14 w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition-[transform,background-color,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-[0_4px_10px_rgba(0,0,0,0.07)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#181818] motion-reduce:transform-none motion-reduce:transition-none ${activeId === preset.id ? "bg-[#eeeeeb]" : "hover:bg-[#f7f7f5]"}`}
               >
                 <span aria-hidden="true" className="flex size-8 shrink-0 items-center justify-center">
                   <span className="block max-h-7 max-w-7 rounded-[2px] border-[1.5px] border-current" style={{ aspectRatio: `${preset.width} / ${preset.height}`, width: preset.width >= preset.height ? 28 : Math.max(7, 28 * preset.width / preset.height), height: preset.height > preset.width ? 28 : Math.max(7, 28 * preset.height / preset.width) }} />

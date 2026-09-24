@@ -4,6 +4,8 @@ import { dimensionsFromSide, MAX_EXPORT_DIMENSION, MIN_OUTPUT_DIMENSION, parseOu
 import { getActiveRatio } from "@/lib/ratios";
 import { getPlatformPresetById, getPlatformName } from "@/constants/platformPresets";
 import { useEditorStore } from "@/store/editorStore";
+import type { ExportSizePreset } from "@/types/editor";
+import { ExportSelect, type ExportSelectOption } from "./ExportSelect";
 
 export function OutputSizeControl({ onValidityChange }: { onValidityChange: (valid: boolean) => void }) {
   const size = useEditorStore((state) => state.exportSize);
@@ -19,6 +21,14 @@ export function OutputSizeControl({ onValidityChange }: { onValidityChange: (val
   const [draft, setDraft] = useState<string | null>(null);
   const [error, setError] = useState("");
   const activePreset = getPlatformPresetById(activePlatformPresetId);
+  const sizeOptions: ExportSelectOption<ExportSizePreset>[] = [
+    { value: "original", label: "Original / Maximum", detail: "Largest available size" },
+    ...(activePreset ? [{ value: "preset" as const, label: `${getPlatformName(activePreset.platform)} · ${activePreset.name}`, detail: `${activePreset.width} × ${activePreset.height}` }] : []),
+    { value: "1080", label: "1080px", detail: "Longest side" },
+    { value: "1440", label: "1440px", detail: "Longest side" },
+    { value: "2160", label: "2160px", detail: "Longest side" },
+    { value: "custom", label: "Custom", detail: "Set width or height" },
+  ];
   const ratio = getActiveRatio(ratioId, customRatio, activePlatformPresetId);
   const requested = dimensionsFromSide(ratio, size.customSide, size.customAxis);
   let geometry = null;
@@ -46,15 +56,7 @@ export function OutputSizeControl({ onValidityChange }: { onValidityChange: (val
 
   return (
     <div className="mt-4 border-t border-[#ececea] pt-3">
-      <label htmlFor="export-size" className="mb-2 block text-xs font-medium">Size</label>
-      <select id="export-size" value={size.preset} onChange={(event) => { setPreset(event.currentTarget.value as typeof size.preset); setDraft(null); setError(""); onValidityChange(true); }} className="min-h-11 w-full rounded-lg border border-[#dededb] bg-white px-3 text-base focus-visible:outline-2 focus-visible:outline-[#181818] sm:text-sm">
-        <option value="original">Original / Maximum</option>
-        {activePreset && <option value="preset">{getPlatformName(activePreset.platform)} · {activePreset.name} ({activePreset.width} × {activePreset.height})</option>}
-        <option value="1080">1080px</option>
-        <option value="1440">1440px</option>
-        <option value="2160">2160px</option>
-        <option value="custom">Custom</option>
-      </select>
+      <ExportSelect id="export-size" label="Size" value={size.preset} options={sizeOptions} onChange={(preset) => { setPreset(preset); setDraft(null); setError(""); onValidityChange(true); }} />
       {size.preset === "custom" && (
         <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
           {(["width", "height"] as const).map((axis) => (

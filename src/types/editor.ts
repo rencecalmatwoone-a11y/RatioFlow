@@ -59,7 +59,7 @@ export interface EditorState {
   customRatio: CustomRatio;
   isManualRatio: boolean;
   manualFrameWidth: number | null;
-  selectedExportRatios: RatioPresetId[];
+  selectedExportRatios: RatioId[];
   crop: CropPosition;
   focalPoint: FocalPoint;
   zoom: number;
@@ -80,7 +80,7 @@ export interface EditorState {
   setManualRatio: (value: number, frameWidth: number) => void;
   setExportSizePreset: (preset: ExportSizePreset) => void;
   setCustomExportSide: (side: number, axis: "width" | "height") => void;
-  toggleExportRatio: (ratioId: RatioPresetId) => void;
+  toggleExportRatio: (ratioId: RatioId) => void;
   selectAllExportRatios: () => void;
   clearExportRatios: () => void;
   setCrop: (crop: CropPosition) => void;

@@ -33,7 +33,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   viewMode: DEFAULT_VIEW_MODE,
   lastFillCrop: CENTER,
   lastFillZoom: DEFAULT_ZOOM,
-  exportFormat: "webp",
+  exportFormat: "png",
   exportQuality: 0.9,
   exportSize: { preset: "original", customSide: 1920, customAxis: "width" },
   setExportSizePreset: (preset) => set((state) => ({ exportSize: { ...state.exportSize, preset } })),
@@ -41,12 +41,14 @@ export const useEditorStore = create<EditorState>((set) => ({
     ? { exportSize: { ...state.exportSize, customSide: side, customAxis: axis } } : state),
   setCustomRatio: (width, height) => set((state) => isValidCustomRatio({ width, height })
     ? { customRatio: { width, height }, selectedRatioId: "custom", activePlatformPresetId: null, isManualRatio: false, manualFrameWidth: null,
+      selectedExportRatios: ["custom"],
       exportSize: state.exportSize.preset === "preset" ? { ...state.exportSize, preset: "original" } : state.exportSize } : state),
   setManualRatio: (value, frameWidth) => set((state) => Number.isFinite(value) && value >= 0.4 && value <= 4 && Number.isFinite(frameWidth) && frameWidth > 0
     ? {
       customRatio: { width: Number(value.toFixed(4)), height: 1 }, selectedRatioId: "custom", isManualRatio: true,
       manualFrameWidth: frameWidth,
       activePlatformPresetId: null,
+      selectedExportRatios: ["custom"],
       exportSize: state.exportSize.preset === "preset" ? { ...state.exportSize, preset: "original" } : state.exportSize,
     } : state),
   setExportFormat: (format) => set({ exportFormat: format }),
@@ -55,6 +57,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   })),
   setSelectedRatio: (ratioId) => set((state) => ({
     selectedRatioId: ratioId,
+    selectedExportRatios: [ratioId],
     isManualRatio: false,
     manualFrameWidth: null,
     activePlatformPresetId: null,
@@ -62,15 +65,19 @@ export const useEditorStore = create<EditorState>((set) => ({
       ? { ...state.exportSize, preset: "original" } : state.exportSize,
   })),
   setActivePlatformPreset: (id) => set((state) => getPlatformPresetById(id)
-    ? { activePlatformPresetId: id, selectedRatioId: "platform", isManualRatio: false, manualFrameWidth: null, exportSize: { ...state.exportSize, preset: "preset" } }
+    ? { activePlatformPresetId: id, selectedRatioId: "platform", selectedExportRatios: ["platform"], isManualRatio: false, manualFrameWidth: null, exportSize: { ...state.exportSize, preset: "preset" } }
     : state),
   setShowSafeZone: (show) => set({ showSafeZone: show }),
   toggleExportRatio: (ratioId) => set((state) => ({
     selectedExportRatios: state.selectedExportRatios.includes(ratioId)
       ? state.selectedExportRatios.filter((id) => id !== ratioId)
-      : RATIOS.filter((ratio) => ratio.id === ratioId || state.selectedExportRatios.includes(ratio.id)).map((ratio) => ratio.id),
+      : [...RATIOS.filter((ratio) => ratio.id === ratioId || state.selectedExportRatios.includes(ratio.id)).map((ratio) => ratio.id),
+        ...(["custom", "platform"] as const).filter((id) => id === ratioId || state.selectedExportRatios.includes(id))],
   })),
-  selectAllExportRatios: () => set({ selectedExportRatios: RATIOS.map((ratio) => ratio.id) }),
+  selectAllExportRatios: () => set((state) => ({ selectedExportRatios: [
+    ...RATIOS.map((ratio) => ratio.id),
+    ...(state.selectedRatioId === "custom" || state.selectedRatioId === "platform" ? [state.selectedRatioId] : []),
+  ] })),
   clearExportRatios: () => set({ selectedExportRatios: [] }),
   setCrop: (crop) => set((state) => ({
     crop,
@@ -113,7 +120,7 @@ export const useEditorStore = create<EditorState>((set) => ({
         imageWidth: width,
         imageHeight: height,
         imageName: file.name,
-        selectedExportRatios: state.selectedRatioId === "custom" || state.selectedRatioId === "platform" ? [] : [state.selectedRatioId],
+        selectedExportRatios: [state.selectedRatioId],
         crop: { x: 0, y: 0 },
         focalPoint: CENTER_FOCAL,
         zoom: DEFAULT_ZOOM,
@@ -133,7 +140,7 @@ export const useEditorStore = create<EditorState>((set) => ({
         imageWidth: null,
         imageHeight: null,
         imageName: null,
-        selectedExportRatios: state.selectedRatioId === "custom" || state.selectedRatioId === "platform" ? [] : [state.selectedRatioId],
+        selectedExportRatios: [state.selectedRatioId],
         crop: { x: 0, y: 0 },
         focalPoint: CENTER_FOCAL,
         zoom: DEFAULT_ZOOM,

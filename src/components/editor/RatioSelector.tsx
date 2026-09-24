@@ -27,14 +27,14 @@ export function RatioSelector() {
               onClick={() => setSelectedRatio(ratio.id)}
               aria-label={`Set aspect ratio to ${ratio.width} by ${ratio.height}`}
               aria-pressed={selected}
-              className={`flex h-12 w-12 flex-col items-center justify-center gap-1 rounded-[13px] text-[9px] font-medium tracking-tight transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#181818] sm:h-[54px] sm:w-[55px] ${selected ? "bg-white text-[#181818] shadow-[0_2px_7px_rgba(0,0,0,0.1)]" : "text-[#777773] hover:bg-white/55 hover:text-[#181818]"}`}
+              className={`flex h-12 w-12 flex-col items-center justify-center gap-1 rounded-[13px] text-[9px] font-medium tracking-tight transition-[transform,background-color,box-shadow,color] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-[0_4px_10px_rgba(0,0,0,0.1)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#181818] motion-reduce:transform-none motion-reduce:transition-none sm:h-[54px] sm:w-[55px] ${selected ? "bg-white text-[#181818] shadow-[0_2px_7px_rgba(0,0,0,0.1)]" : "text-[#777773] hover:bg-white/75 hover:text-[#181818]"}`}
             >
               <RatioIcon ratio={ratio.id} />
               <span aria-hidden="true">{ratio.label}</span>
             </button>
           );
         })}
-        <button type="button" onClick={() => setSelectedRatio("custom")} aria-label={`Set custom aspect ratio ${getActiveRatio("custom", customRatio).label}`} aria-pressed={selectedRatioId === "custom" && !manualMatch} className={`flex h-12 w-12 flex-col items-center justify-center gap-1 rounded-[13px] text-[9px] font-medium tracking-tight transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#181818] sm:h-[54px] sm:w-[55px] ${selectedRatioId === "custom" && !manualMatch ? "bg-white text-[#181818] shadow-[0_2px_7px_rgba(0,0,0,0.1)]" : "text-[#777773] hover:bg-white/55 hover:text-[#181818]"}`}>
+        <button type="button" onClick={() => setSelectedRatio("custom")} aria-label={`Set custom aspect ratio ${getActiveRatio("custom", customRatio).label}`} aria-pressed={selectedRatioId === "custom" && !manualMatch} className={`flex h-12 w-12 flex-col items-center justify-center gap-1 rounded-[13px] text-[9px] font-medium tracking-tight transition-[transform,background-color,box-shadow,color] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-[0_4px_10px_rgba(0,0,0,0.1)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#181818] motion-reduce:transform-none motion-reduce:transition-none sm:h-[54px] sm:w-[55px] ${selectedRatioId === "custom" && !manualMatch ? "bg-white text-[#181818] shadow-[0_2px_7px_rgba(0,0,0,0.1)]" : "text-[#777773] hover:bg-white/75 hover:text-[#181818]"}`}>
           <RatioIcon ratio="custom" customRatio={customRatio} />
           <span aria-hidden="true">Custom</span>
         </button>

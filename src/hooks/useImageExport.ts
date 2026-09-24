@@ -95,7 +95,12 @@ export function useImageExport() {
   return {
     downloadCurrent: () => runExport([useEditorStore.getState().selectedRatioId], true),
     downloadSelected: () => runExport([...useEditorStore.getState().selectedExportRatios], false),
-    downloadAll: () => runExport(RATIOS.map((ratio) => ratio.id), false),
+    downloadAll: () => {
+      const current = useEditorStore.getState().selectedRatioId;
+      const ratioIds: RatioId[] = RATIOS.map((ratio) => ratio.id);
+      if (current === "custom" || current === "platform") ratioIds.push(current);
+      return runExport(ratioIds, false);
+    },
     isExporting,
     status,
     error,
