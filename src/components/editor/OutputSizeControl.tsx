@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { calculateExportGeometry } from "@/lib/exportImage";
 import { dimensionsFromSide, MAX_EXPORT_DIMENSION, MIN_OUTPUT_DIMENSION, parseOutputInput, requestedLongestSide } from "@/lib/exportDimensions";
 import { getActiveRatio } from "@/lib/ratios";
@@ -20,6 +20,11 @@ export function OutputSizeControl({ onValidityChange }: { onValidityChange: (val
   const viewMode = useEditorStore((state) => state.viewMode);
   const [draft, setDraft] = useState<string | null>(null);
   const [error, setError] = useState("");
+  useEffect(() => {
+    setDraft(null);
+    setError("");
+    onValidityChange(true);
+  }, [size.preset, onValidityChange]);
   const activePreset = getPlatformPresetById(activePlatformPresetId);
   const sizeOptions: ExportSelectOption<ExportSizePreset>[] = [
     { value: "original", label: "Original / Maximum", detail: "Largest available size" },

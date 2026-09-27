@@ -35,11 +35,11 @@ export function ExportMenu() {
   const activePlatformPreset = getPlatformPresetById(activePlatformPresetId);
   const exportRatios: { id: RatioId; label: string; dynamic?: boolean }[] = [
     ...RATIOS,
-    ...(selectedRatioId === "custom" || selectedRatioId === "platform" ? [{
+    ...(selectedRatioId === "free" || selectedRatioId === "custom" || selectedRatioId === "platform" ? [{
       id: selectedRatioId,
       label: selectedRatioId === "platform" && activePlatformPreset
         ? `${getPlatformName(activePlatformPreset.platform)} · ${activePlatformPreset.name} (${activeRatio.label})`
-        : `Custom · ${activeRatio.label}`,
+        : selectedRatioId === "free" ? "Free · original image ratio" : `Custom · ${activeRatio.label}`,
       dynamic: true,
     }] : []),
   ];
@@ -62,7 +62,7 @@ export function ExportMenu() {
   return (
     <div
       ref={container}
-      className="relative flex flex-col items-center"
+      className="relative flex w-full flex-col items-center"
       onKeyDown={(event) => {
         if (event.key === "Escape" && isOpen) {
           setIsOpen(false);
@@ -70,23 +70,35 @@ export function ExportMenu() {
         }
       }}
     >
-      <button
-        ref={trigger}
-        type="button"
-        aria-expanded={isOpen}
-        aria-controls="export-options"
-        onClick={() => {
-          if (!isOpen) { clearError(); setSizeValid(true); }
-          if (!isOpen) setMounted(true);
-          setIsOpen(!isOpen);
-        }}
-        className="inline-flex min-h-11 items-center justify-center gap-3 rounded-full bg-[#1e1e1e] px-5 text-[13px] font-medium text-white transition-colors duration-150 hover:bg-[#383838] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#181818] motion-reduce:transition-none"
-      >
-        Export
-        <svg aria-hidden="true" viewBox="0 0 16 16" fill="none" className="h-4 w-4">
-          <path d="M8 2.5v8m0 0 3-3m-3 3-3-3M3 12.5h10" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
+      <div className="flex w-full max-w-[350px] items-center gap-2">
+        <button
+          type="button"
+          onClick={() => { clearError(); void downloadCurrent(); }}
+          disabled={isExporting || !sizeValid}
+          className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-full bg-[#1e1e1e] px-5 text-sm font-medium text-white shadow-[0_5px_16px_rgba(0,0,0,0.12)] transition-[background-color,transform,box-shadow] duration-150 hover:-translate-y-0.5 hover:bg-[#383838] hover:shadow-[0_7px_18px_rgba(0,0,0,0.16)] active:translate-y-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#181818] disabled:cursor-wait disabled:opacity-60 motion-reduce:transform-none motion-reduce:transition-none"
+        >
+          <svg aria-hidden="true" viewBox="0 0 16 16" fill="none" className="h-4 w-4">
+            <path d="M8 2.5v8m0 0 3-3m-3 3-3-3M3 12.5h10" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          {isExporting ? "Preparing image..." : "Download Image"}
+        </button>
+        <button
+          ref={trigger}
+          type="button"
+          aria-label="Download options"
+          aria-expanded={isOpen}
+          aria-controls="export-options"
+          onClick={() => {
+            clearError();
+            setSizeValid(true);
+            if (!isOpen) setMounted(true);
+            setIsOpen(!isOpen);
+          }}
+          className="inline-flex min-h-12 items-center justify-center rounded-full border border-[#d7d7d2] bg-white px-4 text-xs font-medium text-[#42423e] transition-colors duration-150 hover:bg-[#efefed] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#181818]"
+        >
+          Options
+        </button>
+      </div>
       {mounted && (
         <div
           id="export-options"
@@ -172,12 +184,12 @@ export function ExportMenu() {
                   Download All
                 </button>
               </div>
-              <p aria-live="polite" className="mt-2 text-xs text-[#62625e] empty:hidden">{status}</p>
-              <p aria-live="polite" className="mt-2 text-xs text-[#a54747] empty:hidden">{error}</p>
             </div>
           </div>
         </div>
       )}
+      <p role="status" aria-live="polite" className="mt-2 text-center text-xs text-[#62625e] empty:hidden">{status}</p>
+      <p role="alert" className="mt-2 text-center text-xs text-[#a54747] empty:hidden">{error}</p>
     </div>
   );
 }

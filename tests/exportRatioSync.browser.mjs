@@ -68,7 +68,7 @@ try {
   })()`);
   await waitFor(`document.body.textContent.includes('ratio-test.png') && !!document.querySelector('.ratio-viewport')`);
 
-  await evaluate(`Array.from(document.querySelectorAll('button')).find(button => button.textContent.trim() === 'Export').click()`);
+  await evaluate(`Array.from(document.querySelectorAll('button')).find(button => button.getAttribute('aria-label') === 'Download options').click()`);
   await waitFor(`!!document.querySelector('#export-options')`);
   assertSelected(await checkedRatios(), ["16:9"]);
   if (!await evaluate(`document.querySelector('#export-format').textContent.includes('PNG')`)) throw new Error("PNG is not the default format");
@@ -97,7 +97,7 @@ try {
   }
   await send("Input.dispatchMouseEvent", { type: "mouseReleased", x: drag.x + drag.delta, y: drag.y, button: "left", buttons: 0, clickCount: 1 });
   await waitFor(`!document.querySelector('#export-options')`);
-  await evaluate(`Array.from(document.querySelectorAll('button')).find(button => button.textContent.trim() === 'Export').click()`);
+  await evaluate(`Array.from(document.querySelectorAll('button')).find(button => button.getAttribute('aria-label') === 'Download options').click()`);
   await waitFor(`!!document.querySelector('#export-options')`);
   await waitFor(`Array.from(document.querySelectorAll('#export-options label')).some(label => label.textContent.trim() === '1:1' && label.querySelector('input:checked'))`);
   assertSelected(await checkedRatios(), ["1:1"]);
@@ -131,7 +131,7 @@ try {
   await new Promise((resolve) => setTimeout(resolve, 40));
   await send("Input.dispatchMouseEvent", { type: "mouseReleased", x: customHandle.x + 55, y: customHandle.y, button: "left", buttons: 0, clickCount: 1 });
   await waitFor(`!document.querySelector('#export-options')`);
-  await evaluate(`Array.from(document.querySelectorAll('button')).find(button => button.textContent.trim() === 'Export').click()`);
+  await evaluate(`Array.from(document.querySelectorAll('button')).find(button => button.getAttribute('aria-label') === 'Download options').click()`);
   await waitFor(`!!document.querySelector('#export-options')`);
   const customSelection = await checkedRatios();
   if (customSelection.length !== 1 || !customSelection[0].startsWith("Custom · ")) throw new Error(`Unexpected custom selection: ${customSelection}`);

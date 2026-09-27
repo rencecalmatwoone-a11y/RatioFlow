@@ -19,13 +19,17 @@ export const RATIOS = [
 ] as const satisfies readonly RatioPreset[];
 
 export type RatioPresetId = (typeof RATIOS)[number]["id"];
-export type RatioId = RatioPresetId | "custom" | "platform";
+export type RatioId = RatioPresetId | "free" | "custom" | "platform";
 export type CustomRatio = { width: number; height: number };
 export const MIN_RATIO_VALUE = 0.1;
 export const MAX_RATIO_VALUE = 100;
 export const DEFAULT_CUSTOM_RATIO: CustomRatio = { width: 21, height: 9 };
 
 export const DEFAULT_RATIO = RATIOS[5];
+
+export function imageRatio(width: number, height: number): CustomRatio {
+  return width >= height ? { width: width / height, height: 1 } : { width: 1, height: height / width };
+}
 
 /** A small relative tolerance lets dragged frames snap to nearby presets. */
 export function getMatchingRatioPreset(value: number, tolerance = 0.01): (typeof RATIOS)[number] | undefined {
@@ -56,7 +60,9 @@ export function getActiveRatio(selectedRatioId: RatioId, customRatio: CustomRati
     const preset = getPlatformPresetById(activePlatformPresetId);
     return preset ? getPresetRatio(preset) : DEFAULT_RATIO;
   }
-  if (selectedRatioId !== "custom") return getRatioPreset(selectedRatioId);
-  const valid = isValidCustomRatio(customRatio) ? customRatio : DEFAULT_CUSTOM_RATIO;
-  return { id: "custom" as const, name: "Custom", label: `${valid.width}:${valid.height}`, ...valid, value: valid.width / valid.height };
+  if (selectedRatioId !== "custom" && selectedRatioId !== "free") return getRatioPreset(selectedRatioId);
+  const valid = selectedRatioId === "free"
+    ? ([customRatio.width, customRatio.height].every((side) => Number.isFinite(side) && side > 0) ? customRatio : DEFAULT_CUSTOM_RATIO)
+    : (isValidCustomRatio(customRatio) ? customRatio : DEFAULT_CUSTOM_RATIO);
+  return { id: selectedRatioId, name: selectedRatioId === "free" ? "Free" : "Custom", label: selectedRatioId === "free" ? "Free" : `${valid.width}:${valid.height}`, ...valid, value: valid.width / valid.height };
 }

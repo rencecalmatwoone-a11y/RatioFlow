@@ -3,8 +3,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "RatioFlow — Instant Image Ratio Converter",
-  description: "Crop and export images into multiple aspect ratios directly in your browser.",
+  title: "RatioFlow — Resize Images to Any Aspect Ratio",
+  description: "Resize, preview, and download images locally in your browser. Your images stay on your device.",
   icons: {
     icon: "/favicon.svg",
   },

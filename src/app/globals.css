@@ -88,15 +88,15 @@ body {
   top: 0;
   bottom: 0;
   display: flex;
-  width: 26px;
+  width: 44px;
   align-items: center;
   cursor: ew-resize;
   touch-action: none;
   user-select: none;
 }
 
-.ratio-resize-handle--left { left: -26px; justify-content: flex-end; }
-.ratio-resize-handle--right { right: -26px; justify-content: flex-start; }
+.ratio-resize-handle--left { left: 0; justify-content: flex-start; padding-left: 8px; }
+.ratio-resize-handle--right { right: 0; justify-content: flex-end; padding-right: 8px; }
 
 .ratio-resize-grip {
   display: block;
@@ -105,7 +105,7 @@ body {
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.78);
   box-shadow: 0 0 0 1px rgba(28, 28, 28, 0.12), 0 1px 5px rgba(0, 0, 0, 0.15);
-  opacity: 0;
+  opacity: 0.3;
   transition: opacity 140ms ease, background-color 140ms ease, box-shadow 140ms ease;
 }
 
@@ -144,7 +144,7 @@ body {
 }
 
 @media (pointer: coarse) {
-  .ratio-resize-handle { width: 36px; }
+  .ratio-resize-grip { opacity: 0.52; }
 }
 
 .ratio-crop-area:focus-visible {

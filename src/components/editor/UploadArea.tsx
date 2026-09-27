@@ -29,7 +29,7 @@ export function UploadArea({ onImage, onError, error, isLoading }: UploadAreaPro
     <section
       {...getRootProps({
         "aria-labelledby": "upload-title",
-        className: `flex min-h-80 w-full flex-col items-center justify-center rounded-[24px] border bg-white px-6 py-12 text-center shadow-[0_12px_35px_rgba(0,0,0,0.04)] transition-colors duration-150 ${isDragReject ? "border-[#c88b8b] bg-[#fffafa]" : isDragActive ? "border-[#9aa9a2] bg-[#f7faf8]" : "border-[#e8e8e6]"}`,
+        className: `flex min-h-80 w-full flex-col items-center justify-center rounded-[24px] border-2 border-dashed bg-white px-6 py-12 text-center shadow-[0_12px_35px_rgba(0,0,0,0.04)] transition-[border-color,background-color,box-shadow] duration-150 ${isDragReject ? "border-[#c88b8b] bg-[#fffafa]" : isDragActive ? "border-[#778f82] bg-[#f7faf8] shadow-[0_16px_40px_rgba(0,0,0,0.08)]" : "border-[#d7d7d2]"}`,
       })}
     >
       <input {...getInputProps()} />
@@ -45,6 +45,7 @@ export function UploadArea({ onImage, onError, error, isLoading }: UploadAreaPro
       <button type="button" onClick={open} disabled={isLoading} className="mt-7 min-h-11 rounded-full bg-[#1e1e1e] px-6 text-sm font-medium text-white transition-opacity hover:opacity-85 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#181818] disabled:opacity-70">
         {isLoading ? "Opening image…" : "Choose Image"}
       </button>
+      <p className="mt-4 text-[11px] font-medium tracking-[0.08em] text-[#73736d]" aria-label="Supported formats: PNG, JPG, and WebP">PNG · JPG · WEBP</p>
       {isLoading && <p role="status" className="mt-4 text-sm text-[#62625e]">Preparing image...</p>}
       {error && <p role="status" className="mt-4 text-sm text-[#a54747]">{error}</p>}
       <p className="mt-7 text-xs text-[#858585]">Processed locally. Your image never leaves your device.</p>

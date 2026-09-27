@@ -57,6 +57,11 @@ async function widthCheck(width, label) {
   }
   console.log(`${label} ${width}px: no page overflow`);
 }
+async function selectOption(id, label) {
+  await evaluate(`document.querySelector('#${id}').click()`);
+  await waitFor(`!!Array.from(document.querySelectorAll('#${id}-options [role=option]')).find(button => button.textContent.trim().startsWith('${label}'))`);
+  await evaluate(`Array.from(document.querySelectorAll('#${id}-options [role=option]')).find(button => button.textContent.trim().startsWith('${label}')).click()`);
+}
 try {
   await send("Page.enable");
   await send("Runtime.enable");
@@ -64,6 +69,9 @@ try {
   await send("Emulation.setDeviceMetricsOverride", { width: 320, height: 900, deviceScaleFactor: 1, mobile: true });
   await send("Page.navigate", { url: appUrl });
   await waitFor(`!!document.querySelector('button') && document.body.textContent.includes('Choose Image')`);
+  if (!await evaluate(`document.body.textContent.includes('Resize images to any aspect ratio. Instantly.') && document.body.textContent.includes('PNG · JPG · WEBP')`)) {
+    throw new Error("Upload introduction or supported formats are missing");
+  }
   for (const width of [320, 375, 768, 1024, 1280, 1440, 1920]) await widthCheck(width, "Upload");
 
   await evaluate(`(async () => {
@@ -82,6 +90,25 @@ try {
   await waitFor(`document.body.textContent.includes('smoke.png') && !!document.querySelector('.ratio-viewport')`);
   for (const width of [320, 375, 768, 1024, 1280, 1440, 1920]) await widthCheck(width, "Editor");
   await send("Emulation.setDeviceMetricsOverride", { width: 1024, height: 900, deviceScaleFactor: 1, mobile: false });
+  await evaluate(`document.querySelector('button[aria-label="Use original image aspect ratio"]').click()`);
+  await waitFor(`document.querySelector('#image-output-info')?.textContent.includes('1600 × 1200')`);
+  await evaluate(`document.querySelector('button[aria-label="Set aspect ratio to 1 by 1"]').click()`);
+  await waitFor(`document.querySelector('#image-output-info')?.textContent.includes('1200 × 1200')`);
+  await evaluate(`Array.from(document.querySelectorAll('button')).find(button => button.textContent.trim() === 'Reset').click()`);
+  await waitFor(`document.querySelector('#image-output-info')?.textContent.includes('1600 × 900')`);
+  await evaluate(`(() => {
+    window.__directBlobs = [];
+    const create = URL.createObjectURL.bind(URL);
+    URL.createObjectURL = blob => { window.__directBlobs.push(blob); return create(blob); };
+    Array.from(document.querySelectorAll('button')).find(button => button.textContent.trim() === 'Download Image').click();
+  })()`);
+  await waitFor(`window.__directBlobs.some(blob => blob.type === 'image/png')`);
+  const directDimensions = await evaluate(`(async () => {
+    const image = await createImageBitmap(window.__directBlobs.find(blob => blob.type === 'image/png'));
+    const result = [image.width, image.height]; image.close(); return result;
+  })()`);
+  if (directDimensions.join('×') !== '1600×900') throw new Error(`Direct download dimensions were ${directDimensions}`);
+  console.log("Free, dimensions, Reset, and direct Download Image: passed");
   await evaluate(`document.querySelector('button[aria-label="Set aspect ratio to 1 by 1"]').click()`);
   await new Promise((resolve) => setTimeout(resolve, 450));
   const beforeDrag = await evaluate(`document.querySelector('.reactEasyCrop_Image').style.transform`);
@@ -101,21 +128,32 @@ try {
   console.log("Mouse drag: crop updated");
 
   await send("Emulation.setDeviceMetricsOverride", { width: 320, height: 900, deviceScaleFactor: 1, mobile: true });
-  await evaluate(`Array.from(document.querySelectorAll('button')).find(button => button.textContent.trim() === 'Export').click()`);
+  await evaluate(`Array.from(document.querySelectorAll('button')).find(button => button.getAttribute('aria-label') === 'Download options').click()`);
   await waitFor(`!!document.querySelector('#export-options')`);
   await widthCheck(320, "Export menu");
-  await evaluate(`Array.from(document.querySelectorAll('button')).find(button => button.textContent.trim() === 'Export').focus()`);
+  await evaluate(`Array.from(document.querySelectorAll('button')).find(button => button.getAttribute('aria-label') === 'Download options').focus()`);
   await send("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
   await send("Input.dispatchKeyEvent", { type: "keyUp", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
   await waitFor(`!document.querySelector('#export-options')`);
-  await evaluate(`Array.from(document.querySelectorAll('button')).find(button => button.textContent.trim() === 'Export').click()`);
+  await evaluate(`Array.from(document.querySelectorAll('button')).find(button => button.getAttribute('aria-label') === 'Download options').click()`);
   await waitFor(`!!document.querySelector('#export-options')`);
-  await evaluate(`document.querySelector('#export-size').value = 'custom'; document.querySelector('#export-size').dispatchEvent(new Event('change', { bubbles: true }))`);
+  await selectOption('export-size', 'Custom');
   await widthCheck(320, "Custom output size");
   if (!await evaluate(`!!document.querySelector('#export-options input[inputmode=numeric]')`)) {
     throw new Error("Custom output controls did not open");
   }
-  await evaluate(`Array.from(document.querySelectorAll('button')).find(button => button.textContent.trim() === 'Export').click()`);
+  await evaluate(`(() => {
+    const input = document.querySelector('#export-options input[inputmode=numeric]');
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, 'bad');
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  })()`);
+  await waitFor(`document.querySelector('#export-options [role=alert]')?.textContent.includes('Enter a whole number')`);
+  await evaluate(`Array.from(document.querySelectorAll('button')).find(button => button.textContent.trim() === 'Reset').click()`);
+  await waitFor(`!document.querySelector('#export-options [role=alert]') && document.querySelector('#export-size')?.textContent.includes('Original')`);
+  if (!await evaluate(`!Array.from(document.querySelectorAll('button')).find(button => button.textContent.trim() === 'Download Image').disabled`)) {
+    throw new Error("Reset did not restore direct download after invalid output size");
+  }
+  await evaluate(`Array.from(document.querySelectorAll('button')).find(button => button.getAttribute('aria-label') === 'Download options').click()`);
   await evaluate(`Array.from(document.querySelectorAll('button')).find(button => button.textContent.includes('Presets')).click()`);
   await waitFor(`!!document.querySelector('#platform-presets')`);
   await widthCheck(320, "Platform presets");
@@ -147,21 +185,13 @@ try {
     window.__smokeBlobs = [];
     const create = URL.createObjectURL.bind(URL);
     URL.createObjectURL = blob => { window.__smokeBlobs.push(blob); return create(blob); };
-    Array.from(document.querySelectorAll('button')).find(button => button.textContent.trim() === 'Export').click();
+    Array.from(document.querySelectorAll('button')).find(button => button.getAttribute('aria-label') === 'Download options').click();
   })()`);
   await waitFor(`!!document.querySelector('#export-options')`);
-  await evaluate(`(() => {
-    const select = document.querySelector('#export-size');
-    Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(select, 'original');
-    select.dispatchEvent(new Event('change', { bubbles: true }));
-  })()`);
+  await selectOption('export-size', 'Original');
   for (const [format, mime] of [['png', 'image/png'], ['jpeg', 'image/jpeg'], ['webp', 'image/webp']]) {
-    await evaluate(`(() => {
-      const select = document.querySelector('#export-format');
-      Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(select, '${format}');
-      select.dispatchEvent(new Event('change', { bubbles: true }));
-      Array.from(document.querySelectorAll('#export-options button')).find(button => button.textContent.includes('Download Current')).click();
-    })()`);
+    await selectOption('export-format', format === 'jpeg' ? 'JPEG' : format === 'webp' ? 'WebP' : 'PNG');
+    await evaluate(`Array.from(document.querySelectorAll('#export-options button')).find(button => button.textContent.includes('Download Current')).click()`);
     await waitFor(`window.__smokeBlobs.length >= ${format === 'png' ? 1 : format === 'jpeg' ? 2 : 3}`);
     const result = await evaluate(`({ type: window.__smokeBlobs.at(-1).type, size: window.__smokeBlobs.at(-1).size })`);
     if (result.type !== mime || result.size === 0) throw new Error(`${format} export failed: ${JSON.stringify(result)}`);
@@ -186,7 +216,7 @@ try {
     input.dispatchEvent(new Event('change', { bubbles: true }));
   })()`);
   await waitFor(`document.body.textContent.includes('large.png') && !!document.querySelector('.ratio-viewport')`, 150);
-  await evaluate(`window.__smokeBlobs = []; Array.from(document.querySelectorAll('button')).find(button => button.textContent.trim() === 'Export').click()`);
+  await evaluate(`window.__smokeBlobs = []; Array.from(document.querySelectorAll('button')).find(button => button.getAttribute('aria-label') === 'Download options').click()`);
   await evaluate(`Array.from(document.querySelectorAll('#export-options button')).find(button => button.textContent.includes('Download All')).click()`);
   await waitFor(`window.__smokeBlobs.some(blob => blob.type === 'application/zip')`, 300);
   console.log("6000 x 4000 Download All: completed");
@@ -204,13 +234,9 @@ try {
     input.dispatchEvent(new Event('change', { bubbles: true }));
   })()`);
   await waitFor(`document.body.textContent.includes('replacement.png') && !!document.querySelector('.ratio-viewport')`, 150);
-  await evaluate(`window.__smokeBlobs = []; Array.from(document.querySelectorAll('button')).find(button => button.textContent.trim() === 'Export').click()`);
-  await evaluate(`(() => {
-    const select = document.querySelector('#export-format');
-    Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(select, 'png');
-    select.dispatchEvent(new Event('change', { bubbles: true }));
-    Array.from(document.querySelectorAll('#export-options button')).find(button => button.textContent.includes('Download Current')).click();
-  })()`);
+  await evaluate(`window.__smokeBlobs = []; Array.from(document.querySelectorAll('button')).find(button => button.getAttribute('aria-label') === 'Download options').click()`);
+  await selectOption('export-format', 'PNG');
+  await evaluate(`Array.from(document.querySelectorAll('#export-options button')).find(button => button.textContent.includes('Download Current')).click()`);
   await waitFor(`window.__smokeBlobs.some(blob => blob.type === 'image/png')`, 150);
   const pixel = await evaluate(`(async () => {
     const image = await createImageBitmap(window.__smokeBlobs.find(blob => blob.type === 'image/png'));
@@ -235,11 +261,7 @@ try {
     document.querySelector('form').requestSubmit();
   })()`);
   await waitFor(`document.body.textContent.includes('2:1 frame')`);
-  await evaluate(`(() => {
-    const select = document.querySelector('#export-size');
-    Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(select, 'custom');
-    select.dispatchEvent(new Event('change', { bubbles: true }));
-  })()`);
+  await selectOption('export-size', 'Custom');
   await waitFor(`!!document.querySelector('#export-options input[inputmode=numeric]')`);
   await evaluate(`(() => {
     const input = document.querySelector('#export-options input[inputmode=numeric]');
@@ -275,7 +297,7 @@ try {
   })()`);
   const selectedZip = await JSZip.loadAsync(Buffer.from(zipBytes, 'base64'));
   const selectedNames = Object.keys(selectedZip.files).sort();
-  if (selectedNames.join(',') !== 'replacement-16x9.png,replacement-1x1.png') {
+  if (selectedNames.join(',') !== 'replacement-1x1.png,replacement-2x1.png') {
     throw new Error(`Download Selected contained unexpected files: ${selectedNames}`);
   }
   console.log("Download Selected: exact ratio set in ZIP");

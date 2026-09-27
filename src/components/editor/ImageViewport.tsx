@@ -216,10 +216,11 @@ export function ImageViewport({ url, name }: ImageViewportProps) {
           tabIndex={0}
           aria-label={`Resize image from ${side} edge`}
           aria-orientation="horizontal"
-          aria-valuemin={0.4}
-          aria-valuemax={4}
+          aria-valuemin={Math.min(0.4, ratio.value)}
+          aria-valuemax={Math.max(4, ratio.value)}
           aria-valuenow={Number(ratio.value.toFixed(3))}
           aria-valuetext={matchedPreset?.label ?? `${ratio.value.toFixed(2)}:1`}
+          aria-describedby="resize-handle-help"
           className={`ratio-resize-handle ratio-resize-handle--${side} ${isResizing && resize.current?.side === side ? "ratio-resize-handle--active" : ""}`}
           onPointerDown={(event) => beginResize(side, event)}
           onPointerMove={moveResize}
@@ -231,6 +232,7 @@ export function ImageViewport({ url, name }: ImageViewportProps) {
           <span className="ratio-resize-grip" aria-hidden="true" />
         </div>
       ))}
+      <span id="resize-handle-help" className="sr-only">Drag this edge, or use left and right arrow keys to resize the image frame. Hold Shift for larger keyboard steps.</span>
       {isResizing && (
         <div className="ratio-drag-label" aria-hidden="true">{matchedPreset?.label ?? `${ratio.value.toFixed(2)}:1`}</div>
       )}

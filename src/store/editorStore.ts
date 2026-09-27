@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { DEFAULT_CUSTOM_RATIO, DEFAULT_RATIO, RATIOS, getMatchingRatioPreset, isValidCustomRatio } from "@/lib/ratios";
+import { DEFAULT_CUSTOM_RATIO, DEFAULT_RATIO, RATIOS, getMatchingRatioPreset, imageRatio, isValidCustomRatio } from "@/lib/ratios";
 import { isValidOutputInput } from "@/lib/exportDimensions";
 import { clampFocalPoint } from "@/lib/focalPoint";
 import { getPlatformPresetById } from "@/constants/platformPresets";
@@ -65,6 +65,8 @@ export const useEditorStore = create<EditorState>((set) => ({
   })),
   setSelectedRatio: (ratioId) => set((state) => ({
     selectedRatioId: ratioId,
+    ...(ratioId === "free" && state.imageWidth && state.imageHeight
+      ? { customRatio: imageRatio(state.imageWidth, state.imageHeight) } : {}),
     selectedExportRatios: [ratioId],
     isManualRatio: false,
     manualFrameWidth: null,
@@ -80,11 +82,11 @@ export const useEditorStore = create<EditorState>((set) => ({
     selectedExportRatios: state.selectedExportRatios.includes(ratioId)
       ? state.selectedExportRatios.filter((id) => id !== ratioId)
       : [...RATIOS.filter((ratio) => ratio.id === ratioId || state.selectedExportRatios.includes(ratio.id)).map((ratio) => ratio.id),
-        ...(["custom", "platform"] as const).filter((id) => id === ratioId || state.selectedExportRatios.includes(id))],
+        ...(["free", "custom", "platform"] as const).filter((id) => id === ratioId || state.selectedExportRatios.includes(id))],
   })),
   selectAllExportRatios: () => set((state) => ({ selectedExportRatios: [
     ...RATIOS.map((ratio) => ratio.id),
-    ...(state.selectedRatioId === "custom" || state.selectedRatioId === "platform" ? [state.selectedRatioId] : []),
+    ...(state.selectedRatioId === "free" || state.selectedRatioId === "custom" || state.selectedRatioId === "platform" ? [state.selectedRatioId] : []),
   ] })),
   clearExportRatios: () => set({ selectedExportRatios: [] }),
   setCrop: (crop) => set((state) => ({
@@ -117,6 +119,24 @@ export const useEditorStore = create<EditorState>((set) => ({
     zoom: DEFAULT_ZOOM,
     ...(state.viewMode === "fill" ? { lastFillZoom: DEFAULT_ZOOM } : {}),
   })),
+  resetEditor: () => set({
+    selectedRatioId: DEFAULT_RATIO.id,
+    activePlatformPresetId: null,
+    showSafeZone: false,
+    customRatio: DEFAULT_CUSTOM_RATIO,
+    isManualRatio: false,
+    manualFrameWidth: null,
+    selectedExportRatios: [DEFAULT_RATIO.id],
+    crop: CENTER,
+    focalPoint: CENTER_FOCAL,
+    zoom: DEFAULT_ZOOM,
+    viewMode: DEFAULT_VIEW_MODE,
+    lastFillCrop: CENTER,
+    lastFillZoom: DEFAULT_ZOOM,
+    exportFormat: "png",
+    exportQuality: 0.9,
+    exportSize: { preset: "original", customSide: 1920, customAxis: "width" },
+  }),
   setImage: (file, url, width, height) =>
     set((state) => {
       if (state.imageUrl && state.imageUrl !== url) {
@@ -128,6 +148,7 @@ export const useEditorStore = create<EditorState>((set) => ({
         imageWidth: width,
         imageHeight: height,
         imageName: file.name,
+        ...(state.selectedRatioId === "free" ? { customRatio: imageRatio(width, height) } : {}),
         selectedExportRatios: [state.selectedRatioId],
         crop: { x: 0, y: 0 },
         focalPoint: CENTER_FOCAL,

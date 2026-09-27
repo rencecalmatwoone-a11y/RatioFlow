@@ -73,7 +73,8 @@ export interface EditorState {
   exportSize: ExportSize;
   setImage: (file: File, url: string, width: number, height: number) => void;
   clearImage: () => void;
-  setSelectedRatio: (ratioId: RatioPresetId | "custom") => void;
+  setSelectedRatio: (ratioId: RatioPresetId | "free" | "custom") => void;
+  resetEditor: () => void;
   setActivePlatformPreset: (id: string) => void;
   setShowSafeZone: (show: boolean) => void;
   setCustomRatio: (width: number, height: number) => void;
