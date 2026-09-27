@@ -70,18 +70,22 @@ export function ExportMenu() {
         }
       }}
     >
-      <div className="flex w-full max-w-[350px] items-center gap-2">
-        <button
-          type="button"
-          onClick={() => { clearError(); void downloadCurrent(); }}
-          disabled={isExporting || !sizeValid}
-          className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-full bg-[#1e1e1e] px-5 text-sm font-medium text-white shadow-[0_5px_16px_rgba(0,0,0,0.12)] transition-[background-color,transform,box-shadow] duration-150 hover:-translate-y-0.5 hover:bg-[#383838] hover:shadow-[0_7px_18px_rgba(0,0,0,0.16)] active:translate-y-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#181818] disabled:cursor-wait disabled:opacity-60 motion-reduce:transform-none motion-reduce:transition-none"
-        >
-          <svg aria-hidden="true" viewBox="0 0 16 16" fill="none" className="h-4 w-4">
-            <path d="M8 2.5v8m0 0 3-3m-3 3-3-3M3 12.5h10" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          {isExporting ? "Preparing image..." : "Download Image"}
-        </button>
+      <div className="flex w-full max-w-[350px] items-start gap-2">
+        <div className="flex min-w-0 flex-1 flex-col items-center">
+          <button
+            type="button"
+            onClick={() => { clearError(); void downloadCurrent(); }}
+            disabled={isExporting || !sizeValid}
+            className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-[#1e1e1e] px-5 text-sm font-medium text-white shadow-[0_5px_16px_rgba(0,0,0,0.12)] transition-[background-color,transform,box-shadow] duration-150 hover:-translate-y-0.5 hover:bg-[#383838] hover:shadow-[0_7px_18px_rgba(0,0,0,0.16)] active:translate-y-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#181818] disabled:cursor-wait disabled:opacity-60 motion-reduce:transform-none motion-reduce:transition-none"
+          >
+            <svg aria-hidden="true" viewBox="0 0 16 16" fill="none" className="h-4 w-4">
+              <path d="M8 2.5v8m0 0 3-3m-3 3-3-3M3 12.5h10" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            {isExporting ? "Preparing image..." : "Download Image"}
+          </button>
+          <p role="status" aria-live="polite" className="mt-2 text-center text-xs text-[#62625e] empty:hidden">{status}</p>
+          <p role="alert" className="mt-2 text-center text-xs text-[#a54747] empty:hidden">{error}</p>
+        </div>
         <button
           ref={trigger}
           type="button"
@@ -188,8 +192,6 @@ export function ExportMenu() {
           </div>
         </div>
       )}
-      <p role="status" aria-live="polite" className="mt-2 text-center text-xs text-[#62625e] empty:hidden">{status}</p>
-      <p role="alert" className="mt-2 text-center text-xs text-[#a54747] empty:hidden">{error}</p>
     </div>
   );
 }
