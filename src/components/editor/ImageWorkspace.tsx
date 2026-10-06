@@ -39,6 +39,7 @@ export function ImageWorkspace() {
   const setShowSafeZone = useEditorStore((state) => state.setShowSafeZone);
   const resetPosition = useEditorStore((state) => state.resetPosition);
   const resetEditor = useEditorStore((state) => state.resetEditor);
+  const resetImage = useEditorStore((state) => state.resetImage);
   const exportSize = useEditorStore((state) => state.exportSize);
   const exportPresetId = useEditorStore((state) => state.exportSize.platformPresetId ?? null);
   const zoom = useEditorStore((state) => selectActiveEditor(state).zoom);
@@ -47,7 +48,7 @@ export function ImageWorkspace() {
   const replaceInput = useRef<HTMLInputElement>(null);
   const addInput = useRef<HTMLInputElement>(null);
   const importFeedback = issues.length > 0 && (
-    <details className="mt-2 text-xs text-[#a54747]">
+    <details className={`mt-2 text-xs ${issues.every((issue) => issue.code === "duplicate") ? "text-[#777]" : "text-[#a54747]"}`}>
       <summary className="min-h-11 cursor-pointer py-3">Review {issues.length} skipped {issues.length === 1 ? "file" : "files"}</summary>
       <ul className="space-y-1 break-words">{issues.map((issue, index) => <li key={index}>{issue.name}: {issue.reason}</li>)}</ul>
     </details>
@@ -121,7 +122,7 @@ export function ImageWorkspace() {
         </div>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
           <button type="button" onClick={resetPosition} className="min-h-11 text-[#858585] underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#181818]">Reset position</button>
-          <button type="button" onClick={resetEditor} className="min-h-11 text-[#555] underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#181818]">Reset</button>
+          <button type="button" onClick={imageCount > 1 ? resetImage : resetEditor} className="min-h-11 text-[#555] underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#181818]">{imageCount > 1 ? "Reset Image" : "Reset"}</button>
           <input ref={replaceInput} type="file" accept={IMAGE_INPUT_ACCEPT} onChange={handleReplace} className="sr-only" tabIndex={-1} aria-label="Replace image file" disabled={isLoading || isExporting} />
           <input ref={addInput} type="file" multiple accept={IMAGE_INPUT_ACCEPT} onChange={handleAdd} className="sr-only" tabIndex={-1} aria-label="Add image files" disabled={isLoading || isExporting} />
           <button type="button" onClick={() => replaceInput.current?.click()} disabled={isLoading || isExporting} aria-label="Replace image" className="min-h-11 text-[#555] underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#181818] disabled:opacity-50">Replace Image</button>

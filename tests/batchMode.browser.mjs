@@ -155,7 +155,7 @@ try {
     new File([new Uint8Array(20 * 1024 * 1024 + 1)], 'huge.jpg', { type: 'image/jpeg' }),
     new File(['corrupt'], 'broken.png', { type: 'image/png' })])`);
   await waitFor(`${thumbnails}.length === 5`);
-  assert.equal(await evaluate(`document.body.textContent.includes("5 images added. 3 files couldn't be added.")`), true);
+  assert.equal(await evaluate(`document.body.textContent.includes("8 files selected · 5 added · 1 unsupported · 1 too large · 1 unreadable.")`), true);
   assert.equal(await evaluate(`${thumbnails}[0].getAttribute('aria-current')`), "true");
   assert.equal(await evaluate(`Array.from(${thumbnails}).map(button => button.getAttribute('aria-label')).join(',')`), "Edit shoot.jpg,Edit shoot.png,Edit third.webp,Edit fourth.png,Edit fifth.png");
   console.log("Mixed multi-upload: JPEG/PNG/WebP accepted, PDF/oversize/corrupt skipped, first photo active");
@@ -206,7 +206,7 @@ try {
   assert.ok(paths.includes("shoot/shoot-1x1.png")); assert.ok(paths.includes("shoot-2/shoot-1x1.png"));
   assert.equal((await batch.zip.file("shoot/shoot-1x1.png").async("base64")), aDownload.bytes);
   assert.equal((await batch.zip.file("shoot-2/shoot-1x1.png").async("base64")), bDownload.bytes);
-  assert.equal(await evaluate(`window.__batchStatuses.filter(status => status.includes('of 15')).length > 2 && window.__batchStatuses.includes('Creating ZIP...')`), true);
+  assert.equal(await evaluate(`window.__batchStatuses.filter(status => status.includes('of 15')).length > 2 && window.__batchStatuses.some(status => status.startsWith('Creating ZIP'))`), true);
   assert.equal(await evaluate(`window.__sourceLocks.length > 0 && window.__sourceLocks.every(Boolean)`), true);
   const pixels = await evaluate(`(async () => {
     const results = [];
@@ -223,7 +223,7 @@ try {
 
   await selectImage(0); await click("Options");
   const selected = await download("Download Selected", true); assert.equal(Object.keys(selected.zip.files).length, 3);
-  const all = await download("Download All", true); assert.equal(Object.keys(all.zip.files).length, 6);
+  const all = await download("Download All Ratios", true); assert.equal(Object.keys(all.zip.files).length, 6);
   const current = await download("Download Current"); assert.equal(current.name, "shoot-1x1.png");
   await click("Options");
   console.log("Current, Selected and All continue exporting only the active photo");
@@ -242,7 +242,7 @@ try {
   assert.equal(await evaluate(`${thumbnails}.length`), 6);
   assertFraming(await framing(), a);
   await selectImage(5); assert.equal((await framing()).zoom, "1");
-  await selectImage(3); await click("Apply ratio to all");
+  await selectImage(3); await click("Apply Story / Reel to all 6 images");
   await selectImage(0); assert.equal((await framing()).zoom, a.zoom);
   await selectImage(1); assert.equal((await framing()).zoom, b.zoom);
   for (let index = 0; index < 6; index++) { await selectImage(index); assert.equal(await evaluate(`document.body.textContent.includes('Story / Reel')`), true); }
@@ -294,7 +294,7 @@ try {
 
   await evaluate(`(() => { window.__failEncode = HTMLCanvasElement.prototype.toBlob; HTMLCanvasElement.prototype.toBlob = callback => setTimeout(() => callback(null), 0); })()`);
   await click("Download Batch");
-  await waitFor(`document.body.textContent.includes('Batch export stopped')`);
+  await waitFor(`document.body.textContent.includes('Could not export')`);
   assert.equal(await evaluate(`${thumbnails}.length`), 6);
   assert.equal(await evaluate(`${button("Download Batch")}.disabled`), false);
   await evaluate(`HTMLCanvasElement.prototype.toBlob = window.__failEncode`);
@@ -303,9 +303,9 @@ try {
 
   await selectImage(2);
   await evaluate(`document.querySelector('button[aria-label="Remove shoot.jpg from batch"]').click()`);
-  assert.equal(await evaluate(`document.querySelector('[data-image-id][aria-current=true]').getAttribute('aria-label')`), "Edit third.webp");
+  assert.equal(await evaluate(`document.querySelector('[data-image-id][aria-current=true]').getAttribute('aria-label')`), "Edit third.webp, edited");
   await evaluate(`document.querySelector('button[aria-label="Remove third.webp from batch"]').click()`);
-  assert.equal(await evaluate(`document.querySelector('[data-image-id][aria-current=true]').getAttribute('aria-label')`), "Edit fourth.png");
+  assert.equal(await evaluate(`document.querySelector('[data-image-id][aria-current=true]').getAttribute('aria-label')`), "Edit fourth.png, edited");
   await click("Clear batch"); await waitFor(`!!document.querySelector('[role=alertdialog]')`);
   await click("Keep images"); assert.equal(await evaluate(`${thumbnails}.length`), 4);
   await click("Clear batch"); await click("Clear all images");

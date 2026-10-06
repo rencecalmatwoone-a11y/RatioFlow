@@ -1,16 +1,16 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import JSZip from "jszip";
-import { createImageEditorState, prepareBatchImages, selectActiveImage } from "../src/lib/batchImages.ts";
+import { createImageEditorState, prepareBatchImages, releaseImageUrls, selectActiveImage, summarizeImageImport } from "../src/lib/batchImages.ts";
 import { MAX_BATCH_IMAGES, MAX_FILE_SIZE, MAX_BATCH_TOTAL_BYTES } from "../src/constants/batchLimits.ts";
 import { useEditorStore } from "../src/store/editorStore.ts";
 import { exportBatchImages, snapshotBatchExport } from "../src/lib/exportBatchImages.ts";
-import { createBatchImageFolderNames } from "../src/lib/fileName.ts";
+import { createBatchImageFolderNames, exportFilename } from "../src/lib/fileName.ts";
 import { calculateExportGeometry } from "../src/lib/exportImage.ts";
 
 function item(id, name = `${id}.png`, editor = createImageEditorState()) {
   const file = new File([id], name, { type: "image/png", lastModified: id.length });
-  return { id, name, file, objectUrl: `blob:${id}`, size: file.size, width: 1600, height: 1000, editor };
+  return { id, name, file, objectUrl: `blob:${id}`, size: file.size, width: 1600, height: 1000, isEdited: false, editor };
 }
 function reset(images = []) {
   useEditorStore.setState({ ...useEditorStore.getInitialState(), batchImages: images, activeImageId: images[0]?.id ?? null }, true);
@@ -178,7 +178,8 @@ test("batch ZIP uses snapshotted framing, global targets and formats sequentiall
       const expected = calculateExportGeometry(a.width, a.height, { width: 1, height: 1 }, a.editor.focalPoint, a.editor.zoom, "fill", snapshot.exportSize);
       assert.equal(draws.at(-4)[1], expected.sourceX); assert.equal(draws.at(-4)[3], expected.sourceWidth);
       assert.notEqual(draws.at(-4)[1], draws.at(-2)[1]);
-      assert.equal(progress.at(-1).phase, "zip"); assert.equal(progress.at(-1).completed, 4);
+      assert.equal(progress.at(-1).phase, "zipping"); assert.equal(progress.at(-1).completed, 4);
+      assert.equal(progress[0].imageName, "same.png"); assert.equal(progress[0].ratioLabel, "1:1");
       assert.ok(progress.every((value, index) => !index || value.completed >= progress[index - 1].completed));
       state.updateImageEditorState("a", a.editor);
     }
@@ -199,10 +200,87 @@ test("batch failure names the photo, releases resources, and leaves the batch av
   try {
     reset([item("fail", "broken-photo.png"), item("keep")]);
     const snapshot = snapshotBatchExport(useEditorStore.getState());
-    await assert.rejects(exportBatchImages(snapshot), /broken-photo.png.*couldn't be processed/);
+    await assert.rejects(exportBatchImages(snapshot), /broken-photo.png.*edits are still saved/);
     assert.equal(useEditorStore.getState().batchImages.length, 2); assert.equal(closes, 1);
     assert.ok(canvases.every((canvas) => canvas.width === 0 && canvas.height === 0));
   } finally { globalThis.createImageBitmap = originalBitmap; globalThis.document = originalDocument; reset(); }
+});
+
+test("edited tracking ignores selection, layout crop, no-op zoom and safe zones; Reset Image affects only the active photo", () => {
+  const state = reset([item("a"), item("b")]);
+  state.setActiveImage("b"); state.setCrop({ x: 12, y: 0 }); state.setZoom(1); state.setShowSafeZone(true);
+  assert.equal(selectActiveImage(useEditorStore.getState()).isEdited, false);
+  state.setFocalPoint({ x: 0.8, y: 0.5 }); state.setZoom(2);
+  assert.equal(selectActiveImage(useEditorStore.getState()).isEdited, true);
+  state.setActiveImage("a"); state.setSelectedRatio("4:5");
+  state.setExportFormat("webp"); state.setCustomExportSide(500, "width"); state.setExportSizePreset("custom");
+  const before = useEditorStore.getState(); const other = before.batchImages[1];
+  state.resetImage();
+  const after = useEditorStore.getState();
+  assert.equal(after.batchImages[0].isEdited, false); assert.deepEqual(after.batchImages[0].editor, createImageEditorState());
+  assert.equal(after.batchImages[1], other);
+  assert.equal(after.exportFormat, "webp"); assert.equal(after.exportSize, before.exportSize);
+  assert.equal(after.selectedExportRatios, before.selectedExportRatios);
+  state.applyRatioToAll();
+  assert.equal(useEditorStore.getState().batchImages[0].isEdited, false, "no-op apply does not mark untouched photos");
+});
+
+test("consolidated import summary accounts for every category, including duplicate feedback", () => {
+  const issues = [{ name: "a", code: "unsupported", reason: "type" }, { name: "b", code: "size", reason: "size" }, { name: "c", code: "decode", reason: "decode" }];
+  assert.equal(summarizeImageImport(8, 5, issues), "8 files selected · 5 added · 1 unsupported · 1 too large · 1 unreadable.");
+  assert.equal(summarizeImageImport(1, 0, [{ name: "a", code: "duplicate", reason: "duplicate" }]), "1 file selected · 0 added · 1 duplicate skipped.");
+});
+
+test("long Unicode filenames stay extractable and collisions after truncation remain unique", () => {
+  const names = ["旅行🌴".repeat(80) + "A.png", "旅行🌴".repeat(80) + "B.png"];
+  const folders = createBatchImageFolderNames(names);
+  assert.equal(new Set(folders).size, 2); assert.ok(folders.every(name => Buffer.byteLength(name) < 120));
+  for (const name of names) {
+    const filename = exportFilename(name, "4:5", "png");
+    assert.ok(filename.startsWith("旅行🌴")); assert.ok(Buffer.byteLength(filename) < 255);
+    assert.ok(!filename.includes("�")); assert.ok(filename.endsWith("-4x5.png"));
+  }
+});
+
+test("small previews reuse the sequential metadata bitmap, reset canvases, survive preview failure, and release both URLs on cancellation", async () => {
+  const previous = { bitmap: globalThis.createImageBitmap, document: globalThis.document, create: URL.createObjectURL, revoke: URL.revokeObjectURL };
+  const urls = new Map(); const canvases = []; const draws = []; let live = 0; let maximum = 0; let next = 0;
+  let cancel = false; let cancelOnEncode = false; let failPreview = false;
+  URL.createObjectURL = blob => { const url = `blob:test-preview-${++next}`; urls.set(url, blob); return url; };
+  URL.revokeObjectURL = url => urls.delete(url);
+  globalThis.createImageBitmap = async () => { live++; maximum = Math.max(maximum, live); return { width: 4032, height: 3024, close() { live--; } }; };
+  globalThis.document = { createElement() {
+    const canvas = { width: 0, height: 0, getContext: () => ({ drawImage: (...args) => draws.push(args) }),
+      toBlob(callback) { if (cancelOnEncode) cancel = true; callback(failPreview ? null : new Blob(["small-preview"], { type: "image/webp" })); } };
+    canvases.push(canvas); return canvas;
+  } };
+  try {
+    const file = new File(["source"], "large.jpg", { type: "image/jpeg" });
+    const normal = await prepareBatchImages([file], []);
+    assert.equal(normal.images[0].width, 4032); assert.ok(normal.images[0].thumbnailUrl);
+    assert.deepEqual(draws[0].slice(1), [0, 0, 128, 96]); assert.equal(maximum, 1); assert.equal(live, 0);
+    assert.equal(urls.size, 2); releaseImageUrls(normal.images[0]); assert.equal(urls.size, 0);
+    cancelOnEncode = true;
+    const cancelled = await prepareBatchImages([file], [], undefined, undefined, () => cancel);
+    assert.equal(cancelled.images.length, 0); assert.equal(urls.size, 0);
+    cancelOnEncode = false; cancel = false; failPreview = true;
+    const readable = await prepareBatchImages([file], []);
+    assert.equal(readable.images.length, 1); assert.equal(readable.images[0].thumbnailUrl, undefined);
+    releaseImageUrls(readable.images[0]); assert.equal(urls.size, 0);
+    assert.ok(canvases.every(canvas => canvas.width === 0 && canvas.height === 0)); assert.equal(live, 0);
+  } finally {
+    globalThis.createImageBitmap = previous.bitmap; globalThis.document = previous.document;
+    URL.createObjectURL = previous.create; URL.revokeObjectURL = previous.revoke;
+  }
+});
+
+test("removing and clearing photos releases their small preview URLs alongside originals", () => {
+  const previous = URL.revokeObjectURL; const revoked = []; URL.revokeObjectURL = url => revoked.push(url);
+  try {
+    const state = reset([{ ...item("a"), thumbnailUrl: "blob:small-a" }, { ...item("b"), thumbnailUrl: "blob:small-b" }]);
+    state.removeImage("a"); assert.deepEqual(revoked, ["blob:a", "blob:small-a"]);
+    state.clearBatch(); assert.deepEqual(revoked, ["blob:a", "blob:small-a", "blob:b", "blob:small-b"]);
+  } finally { URL.revokeObjectURL = previous; reset(); }
 });
 
 test("batch Free targets resolve the original ratio of each source, including photos edited with another ratio", async () => {

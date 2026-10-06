@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { prepareBatchImages, selectActiveImage, type ImageImportIssue } from "@/lib/batchImages";
+import { prepareBatchImages, releaseImageUrls, selectActiveImage, summarizeImageImport, type ImageImportIssue } from "@/lib/batchImages";
 import { useEditorStore } from "@/store/editorStore";
 
 export function useImage() {
@@ -24,15 +24,14 @@ export function useImage() {
           if (currentRequest === requestId.current) setStatus(`Preparing ${current} of ${total} images...`);
         }, () => currentRequest !== requestId.current);
       if (currentRequest !== requestId.current) {
-        result.images.forEach((image) => URL.revokeObjectURL(image.objectUrl));
+        result.images.forEach(releaseImageUrls);
         return;
       }
       if (replace && active && result.images[0]) state.replaceImage(active.id, result.images[0]);
       else if (!replace) state.addImages(result.images);
       setIssues(result.issues);
       const count = result.images.length;
-      setStatus(`${count} ${count === 1 ? "image" : "images"} ${replace ? "replaced" : "added"}.${result.issues.length
-        ? ` ${result.issues.length} ${result.issues.length === 1 ? "file couldn't" : "files couldn't"} be added.` : ""}`);
+      setStatus(summarizeImageImport(files.length, count, result.issues, replace));
     } catch {
       if (currentRequest === requestId.current) setStatus("Could not prepare these images. Please try again.");
     } finally {
@@ -45,7 +44,7 @@ export function useImage() {
     requestId.current += 1;
     // Export snapshots own Files, so unmounting can release all preview URLs safely.
     const state = useEditorStore.getState();
-    state.batchImages.forEach((image) => URL.revokeObjectURL(image.objectUrl));
+    state.batchImages.forEach(releaseImageUrls);
     useEditorStore.setState({ batchImages: [], activeImageId: null, isPreparingImages: false });
   }, []);
 

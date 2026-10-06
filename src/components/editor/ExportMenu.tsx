@@ -21,6 +21,7 @@ export function ExportMenu() {
   const trigger = useRef<HTMLButtonElement>(null);
   const exportFormat = useEditorStore((state) => state.exportFormat);
   const exportQuality = useEditorStore((state) => state.exportQuality);
+  const exportSize = useEditorStore((state) => state.exportSize);
   const imageCount = useEditorStore((state) => state.batchImages.length);
   const isPreparingImages = useEditorStore((state) => state.isPreparingImages);
   const ratioConfiguration = useEditorStore((state) => state.exportRatioConfiguration);
@@ -33,10 +34,17 @@ export function ExportMenu() {
   const toggleExportRatio = useEditorStore((state) => state.toggleExportRatio);
   const selectAllExportRatios = useEditorStore((state) => state.selectAllExportRatios);
   const clearExportRatios = useEditorStore((state) => state.clearExportRatios);
-  const { downloadCurrent, downloadSelected, downloadAll, downloadBatch, isExporting, exportScope, status, error, clearError } = useImageExport();
+  const { downloadCurrent, downloadSelected, downloadAll, downloadBatch, isExporting, exportScope, phase, progress, announcement, status, error, clearError } = useImageExport();
   const busy = isExporting || isPreparingImages;
   const activeRatio = getActiveRatio(selectedRatioId, customRatio, activePlatformPresetId);
   const activePlatformPreset = getPlatformPresetById(activePlatformPresetId);
+  const outputPreset = getPlatformPresetById(exportSize.platformPresetId ?? ratioConfiguration.platformPresetId);
+  const sizeLabel = exportSize.preset === "original" ? "Original / Maximum"
+    : exportSize.preset === "custom" ? `${exportSize.customSide}px ${exportSize.customAxis}${selectedExportRatios.length > 1 ? " reference · longest side per ratio" : ""}`
+    : exportSize.preset === "preset" && outputPreset ? `${outputPreset.width} × ${outputPreset.height}${selectedExportRatios.length > 1 ? " reference" : ""}`
+    : `${exportSize.preset}px longest side`;
+  const batchCount = imageCount * selectedExportRatios.length;
+  const batchVisible = exportScope === "batch";
   const dynamicIds = (["free", "custom", "platform"] as const).filter((id) => selectedRatioId === id || selectedExportRatios.includes(id));
   const exportRatios: { id: RatioId; label: string; dynamic?: boolean }[] = [
     ...RATIOS,
@@ -89,8 +97,8 @@ export function ExportMenu() {
             </svg>
             {isExporting && exportScope !== "batch" ? "Preparing image..." : "Download Image"}
           </button>
-          <p role="status" aria-live="polite" className="mt-2 text-center text-xs text-[#62625e] empty:hidden">{status}</p>
-          <p role="alert" className="mt-2 text-center text-xs text-[#a54747] empty:hidden">{error}</p>
+          <p role="status" aria-live="polite" className="mt-2 text-center text-xs text-[#62625e] empty:hidden">{!batchVisible && status}</p>
+          <p role="alert" className="mt-2 text-center text-xs text-[#a54747] empty:hidden">{!batchVisible && error}</p>
         </div>
         <button
           ref={trigger}
@@ -99,7 +107,7 @@ export function ExportMenu() {
           aria-expanded={isOpen}
           aria-controls="export-options"
           onClick={() => {
-            clearError();
+            if (!batchVisible) clearError();
             setSizeValid(true);
             if (!isOpen) setMounted(true);
             setIsOpen(!isOpen);
@@ -110,14 +118,30 @@ export function ExportMenu() {
         </button>
       </div>
       {imageCount > 1 && (
-        <div className="mt-3 flex w-full max-w-[350px] flex-col items-center">
+        <div data-export-phase={batchVisible ? phase : "idle"} className="mt-3 flex w-full max-w-[350px] flex-col items-center">
           <button type="button" onClick={() => { clearError(); void downloadBatch(); }}
             disabled={busy || !sizeValid || selectedExportRatios.length === 0}
             className="min-h-12 w-full rounded-full border border-[#d7d7d2] bg-white px-5 text-sm font-medium text-[#343430] hover:bg-[#efefed] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#181818] disabled:opacity-50">
-            {isExporting && exportScope === "batch" ? "Preparing batch..." : "Download Batch"}
+            {isExporting && batchVisible ? phase === "zipping" ? "Creating ZIP..." : phase === "preparing" ? "Preparing batch..." : "Exporting batch..." : "Download Batch"}
           </button>
           <p className="mt-2 text-center text-[11px] text-[#777]">{imageCount} images · {selectedExportRatios.length} {selectedExportRatios.length === 1 ? "ratio" : "ratios"} · {imageCount * selectedExportRatios.length} files will be exported</p>
           <p className="mt-1 text-center text-[11px] text-[#858580]">Choose batch ratios in Options.</p>
+          <p className="mt-1 text-center text-[11px] text-[#777]">{exportFormat === "webp" ? "WebP" : exportFormat.toUpperCase()}{exportFormat !== "png" ? ` · Quality ${Math.round(exportQuality * 100)}%` : " · Lossless"} · {sizeLabel}</p>
+          {batchCount >= 100 && <p className="mt-1 text-center text-[11px] text-[#777]">{batchCount} files may take longer to prepare.</p>}
+          {!selectedExportRatios.length && <p className="mt-1 text-xs text-[#777]">Select at least one ratio in Options.</p>}
+          {!sizeValid && <p className="mt-1 text-xs text-[#777]">Enter a valid output size in Options.</p>}
+          {isPreparingImages && <p className="mt-1 text-xs text-[#777]">Finish adding images before downloading.</p>}
+          {batchVisible && progress && (phase === "exporting" || phase === "zipping") && (
+            <div className="mt-3 w-full">
+              <div role="progressbar" aria-label="Batch export progress" aria-live="off" aria-valuemin={0} aria-valuemax={progress.total} aria-valuenow={progress.completed} className="h-1.5 overflow-hidden rounded-full bg-[#e5e5e2]">
+                <div className="h-full bg-[#62625e]" style={{ width: `${progress.completed / progress.total * 100}%` }} />
+              </div>
+            </div>
+          )}
+          <p aria-live="off" className="mt-2 w-full break-words text-center text-xs text-[#62625e] empty:hidden">{batchVisible && status}</p>
+          <p role="status" aria-live="polite" className="sr-only">{batchVisible && announcement}</p>
+          <p role="alert" className="mt-2 w-full break-words text-center text-xs text-[#a54747] empty:hidden">{batchVisible && error}</p>
+          {batchVisible && phase === "error" && error && <button type="button" disabled={busy || !sizeValid || !selectedExportRatios.length} onClick={() => void downloadBatch()} className="mt-1 min-h-11 rounded-md px-4 text-xs text-[#555] underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#181818] disabled:opacity-50">Retry batch</button>}
         </div>
       )}
       {mounted && (
@@ -127,7 +151,8 @@ export function ExportMenu() {
           inert={!isOpen}
           className={`order-first mb-3 w-[min(40rem,calc(100vw-2rem))] rounded-2xl border border-[#e6e6e4] bg-white p-5 text-[#242424] shadow-[0_12px_35px_rgba(0,0,0,0.12)] sm:absolute sm:bottom-full sm:left-1/2 sm:z-20 sm:mb-3 sm:-translate-x-1/2 sm:p-6 ${isOpen ? "export-panel-enter" : "export-panel-exit"}`}
         >
-          <div className="grid gap-5 sm:grid-cols-2 sm:gap-7">
+          <fieldset disabled={busy} className="grid gap-5 sm:grid-cols-2 sm:gap-7">
+            <legend className="sr-only">Download settings and active image actions</legend>
             <div className="min-w-0">
               <ExportSelect
                 id="export-format"
@@ -203,11 +228,11 @@ export function ExportMenu() {
                   disabled={busy || !sizeValid}
                   className="min-h-11 w-full rounded-full border border-[#dededb] px-4 text-sm font-medium transition-colors duration-150 hover:bg-[#f5f5f3] disabled:cursor-wait disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#181818] motion-reduce:transition-none"
                 >
-                  Download All
+                  {imageCount > 1 ? "Download All Ratios" : "Download All"}
                 </button>
               </div>
             </div>
-          </div>
+          </fieldset>
         </div>
       )}
     </div>

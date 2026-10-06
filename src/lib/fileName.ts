@@ -8,11 +8,19 @@ export const EXPORT_FORMATS: Record<ExportFormat, { mime: string; extension: str
 };
 
 export function exportBaseName(imageName: string): string {
-  return imageName
+  let base = imageName
     .replace(/\.[^.]+$/, "")
     .replace(/[<>:"/\\|?*\x00-\x1f]/g, "-")
     .trim()
     .replace(/[. ]+$/, "") || "image";
+  // Bound UTF-8 bytes as well as characters; common ZIP extractors limit path components to 255 bytes.
+  let bytes = 0;
+  const encoder = new TextEncoder();
+  base = Array.from(base).filter((character) => {
+    bytes += encoder.encode(character).length;
+    return bytes <= 100;
+  }).join("").replace(/[. ]+$/, "") || "image";
+  return /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(base) ? `image-${base}` : base;
 }
 
 /** Case-insensitive uniqueness also keeps ZIP extraction safe on Windows/macOS. */
@@ -30,15 +38,13 @@ export function uniqueExportName(name: string, used: Set<string>, isFile = false
 export function createBatchImageFolderNames(imageNames: readonly string[]): string[] {
   const used = new Set<string>();
   return imageNames.map((name) => {
-    let base = exportBaseName(name).slice(0, 100).replace(/[. ]+$/, "") || "image";
-    if (/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(base)) base = `image-${base}`;
-    return uniqueExportName(base, used);
+    return uniqueExportName(exportBaseName(name), used);
   });
 }
 
 export function exportFilename(imageName: string, ratioId: RatioId, format: ExportFormat, customLabel?: string, platformPresetId?: string): string {
   const label = ratioId === "platform" ? (platformPresetId ?? "platform") : ratioId === "custom" ? (customLabel ?? "custom") : ratioId;
-  const safeLabel = label.toLowerCase().replace(/:/g, "x").replace(/[^a-z0-9.-]+/g, "-").replace(/^[.-]+|[.-]+$/g, "") || "image";
+  const safeLabel = label.toLowerCase().replace(/:/g, "x").replace(/[^a-z0-9.-]+/g, "-").slice(0, 80).replace(/^[.-]+|[.-]+$/g, "") || "image";
   return `${exportBaseName(imageName)}-${safeLabel}.${EXPORT_FORMATS[format].extension}`;
 }
 

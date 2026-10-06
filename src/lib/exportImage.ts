@@ -93,16 +93,22 @@ async function decodeOriginal(file: File): Promise<{ image: CanvasImageSource; c
   }
 
   const url = URL.createObjectURL(file);
+  const element = new Image();
+  const release = () => {
+    element.onload = null;
+    element.onerror = null;
+    element.removeAttribute("src");
+    URL.revokeObjectURL(url);
+  };
   try {
     const image = await new Promise<HTMLImageElement>((resolve, reject) => {
-      const element = new Image();
       element.onload = () => resolve(element);
       element.onerror = () => reject(new Error("Image decoding failed"));
       element.src = url;
     });
-    return { image, close: () => URL.revokeObjectURL(url) };
+    return { image, close: release };
   } catch (error) {
-    URL.revokeObjectURL(url);
+    release();
     throw error;
   }
 }

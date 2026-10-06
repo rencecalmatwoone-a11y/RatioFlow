@@ -66,10 +66,12 @@ export type BatchImageItem = {
   id: string;
   file: File;
   objectUrl: string;
+  thumbnailUrl?: string;
   name: string;
   width: number;
   height: number;
   size: number;
+  isEdited: boolean;
   editor: ImageEditorState;
 };
 
@@ -101,6 +103,7 @@ export interface EditorState {
   setIsExporting: (exporting: boolean) => void;
   setSelectedRatio: (ratioId: RatioPresetId | "free" | "custom") => void;
   resetEditor: () => void;
+  resetImage: () => void;
   setActivePlatformPreset: (id: string) => void;
   setShowSafeZone: (show: boolean) => void;
   setCustomRatio: (width: number, height: number) => void;

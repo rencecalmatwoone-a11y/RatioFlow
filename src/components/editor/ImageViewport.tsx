@@ -30,6 +30,7 @@ export function ImageViewport({ url, name }: ImageViewportProps) {
   const viewMode = useEditorStore((state) => selectActiveEditor(state).viewMode);
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
+  const [previewState, setPreviewState] = useState<"loading" | "ready" | "error">("loading");
   const viewport = useRef<HTMLDivElement>(null);
   const resize = useRef<{ pointerId: number; side: "left" | "right"; startX: number; startWidth: number; startHeight: number; workspaceWidth: number; minWidth: number } | null>(null);
   const pendingResize = useRef<{ ratio: number; width: number } | null>(null);
@@ -159,6 +160,7 @@ export function ImageViewport({ url, name }: ImageViewportProps) {
   return (
     <div
       ref={viewport}
+      aria-busy={previewState === "loading"}
       className={`ratio-viewport relative mx-auto overflow-hidden rounded-[20px] border border-black/[0.07] bg-[#e8e7de] shadow-[0_12px_35px_rgba(0,0,0,0.07),0_2px_8px_rgba(0,0,0,0.03)] sm:rounded-[24px] ${isResizing ? "ratio-viewport--resizing" : ""}`}
       style={{
         width: manualFrameWidth === null
@@ -176,6 +178,7 @@ export function ImageViewport({ url, name }: ImageViewportProps) {
           minZoom={minZoom}
           maxZoom={maxZoom}
           onZoomChange={setZoom}
+          onMediaLoaded={() => setPreviewState("ready")}
           zoomWithScroll={false}
           aspect={ratio.value}
           objectFit={viewMode === "fill" ? "cover" : "contain"}
@@ -205,11 +208,13 @@ export function ImageViewport({ url, name }: ImageViewportProps) {
           style={{
             containerStyle: { cursor: isDragging ? "grabbing" : "grab" },
             cropAreaStyle: { border: 0, boxShadow: "none" },
+            mediaStyle: { visibility: previewState === "ready" ? "visible" : "hidden" },
           }}
           classes={{ cropAreaClassName: "ratio-crop-area" }}
           cropperProps={{ "aria-label": `Reposition ${name}. Use arrow keys to move the image.` }}
-          mediaProps={{ draggable: false }}
+          mediaProps={{ draggable: false, onError: () => setPreviewState("error") }}
         />
+        {previewState !== "ready" && <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-[#e8e7de] px-6 text-center text-xs text-[#777]">{previewState === "loading" ? "Loading preview…" : "Preview unavailable. Replace this image to continue."}</div>}
         {safeZone && <SafeZoneOverlay key={safeZone.presetId} guide={safeZone} visible={showSafeZone} />}
       </div>
       {(["left", "right"] as const).map((side) => (

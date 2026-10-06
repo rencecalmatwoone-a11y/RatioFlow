@@ -2,21 +2,37 @@ import { create } from "zustand";
 import { DEFAULT_CUSTOM_RATIO, DEFAULT_RATIO, RATIOS, getMatchingRatioPreset, imageRatio, isValidCustomRatio } from "../lib/ratios.ts";
 import { isValidOutputInput } from "../lib/exportDimensions.ts";
 import { clampFocalPoint } from "../lib/focalPoint.ts";
-import { createImageEditorState, MAX_ZOOM, MIN_ZOOM, selectActiveImage, selectActiveEditor } from "../lib/batchImages.ts";
+import { createImageEditorState, MAX_ZOOM, MIN_ZOOM, releaseImageUrls, selectActiveImage, selectActiveEditor } from "../lib/batchImages.ts";
 import { getPlatformPresetById } from "../constants/platformPresets.ts";
 import type { EditorState, ImageEditorState } from "../types/editor.ts";
 
 export { selectActiveImage, selectActiveEditor } from "../lib/batchImages.ts";
 
-function updateEditor(state: EditorState, id: string | null, patch: Partial<ImageEditorState>): Partial<EditorState> {
-  return { batchImages: state.batchImages.map((image) => image.id === id
-    ? { ...image, editor: { ...image.editor, ...patch } } : image) };
+function editorChanged(editor: ImageEditorState, patch: Partial<ImageEditorState>): boolean {
+  return (Object.keys(patch) as (keyof ImageEditorState)[]).some((key) => {
+    const value = patch[key];
+    const previous = editor[key];
+    if (typeof value === "object" && value !== null && typeof previous === "object" && previous !== null) {
+      return Object.keys(value).some((axis) => value[axis as keyof typeof value] !== previous[axis as keyof typeof previous]);
+    }
+    return value !== previous;
+  });
+}
+
+function updateEditor(state: EditorState, id: string | null, patch: Partial<ImageEditorState>, intentional = false): Partial<EditorState> {
+  let changed = false;
+  const batchImages = state.batchImages.map((image) => {
+    if (image.id !== id || !editorChanged(image.editor, patch)) return image;
+    changed = true;
+    return { ...image, editor: { ...image.editor, ...patch }, isEdited: image.isEdited || intentional };
+  });
+  return changed ? { batchImages } : state;
 }
 
 function ratioUpdate(state: EditorState, patch: Partial<ImageEditorState>): Partial<EditorState> {
   const editor = { ...selectActiveEditor(state), ...patch };
   return {
-    ...updateEditor(state, state.activeImageId, patch),
+    ...updateEditor(state, state.activeImageId, patch, true),
     // Preserve single-photo synchronization. A shoot has explicit shared export targets.
     ...(state.batchImages.length <= 1 ? {
       selectedExportRatios: [editor.selectedRatioId],
@@ -38,7 +54,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   setIsPreparingImages: (isPreparingImages) => set({ isPreparingImages }),
   setIsExporting: (isExporting) => set({ isExporting }),
   addImages: (images) => set((state) => {
-    if (state.isExporting) { images.forEach((image) => URL.revokeObjectURL(image.objectUrl)); return state; }
+    if (state.isExporting) { images.forEach(releaseImageUrls); return state; }
     const first = state.batchImages.length === 0 ? images[0]?.editor : undefined;
     return { batchImages: [...state.batchImages, ...images], activeImageId: state.activeImageId ?? images[0]?.id ?? null,
       ...(first ? { selectedExportRatios: [first.selectedRatioId],
@@ -48,34 +64,35 @@ export const useEditorStore = create<EditorState>((set) => ({
   }),
   replaceImage: (id, image) => set((state) => {
     const previous = state.batchImages.find((item) => item.id === id);
-    if (state.isExporting || !previous) { URL.revokeObjectURL(image.objectUrl); return state; }
-    URL.revokeObjectURL(previous.objectUrl);
+    if (state.isExporting || !previous) { releaseImageUrls(image); return state; }
+    releaseImageUrls(previous);
     return { batchImages: state.batchImages.map((item) => item.id === id ? { ...image, id } : item) };
   }),
   removeImage: (id) => set((state) => {
     if (state.isExporting || state.isPreparingImages) return state;
     const index = state.batchImages.findIndex((image) => image.id === id);
     if (index < 0) return state;
-    URL.revokeObjectURL(state.batchImages[index].objectUrl);
+    releaseImageUrls(state.batchImages[index]);
     const batchImages = state.batchImages.filter((image) => image.id !== id);
     return { batchImages, activeImageId: state.activeImageId === id
       ? batchImages[Math.min(index, batchImages.length - 1)]?.id ?? null : state.activeImageId };
   }),
   clearBatch: () => set((state) => {
     if (state.isExporting || state.isPreparingImages) return state;
-    state.batchImages.forEach((image) => URL.revokeObjectURL(image.objectUrl));
+    state.batchImages.forEach(releaseImageUrls);
     return { batchImages: [], activeImageId: null };
   }),
   setActiveImage: (id) => set((state) => state.batchImages.some((image) => image.id === id) ? { activeImageId: id } : state),
-  updateImageEditorState: (id, patch) => set((state) => updateEditor(state, id, patch)),
+  updateImageEditorState: (id, patch) => set((state) => updateEditor(state, id, patch, true)),
   applyRatioToAll: () => set((state) => {
     const active = selectActiveImage(state);
     if (!active) return state;
     const { selectedRatioId, customRatio, activePlatformPresetId } = active.editor;
-    return { batchImages: state.batchImages.map((image) => ({ ...image, editor: { ...image.editor,
-      selectedRatioId, activePlatformPresetId, customRatio: selectedRatioId === "free"
-        ? imageRatio(image.width, image.height) : { ...customRatio }, isManualRatio: false, manualFrameWidth: null,
-    } })) };
+    return { batchImages: state.batchImages.map((image) => {
+      const patch = { selectedRatioId, activePlatformPresetId, customRatio: selectedRatioId === "free"
+        ? imageRatio(image.width, image.height) : { ...customRatio }, isManualRatio: false, manualFrameWidth: null };
+      return editorChanged(image.editor, patch) ? { ...image, isEdited: true, editor: { ...image.editor, ...patch } } : image;
+    }) };
   }),
   setExportSizePreset: (preset) => set((state) => {
     const platformPresetId = selectActiveEditor(state).activePlatformPresetId
@@ -123,24 +140,27 @@ export const useEditorStore = create<EditorState>((set) => ({
   clearExportRatios: () => set({ selectedExportRatios: [] }),
   setCrop: (crop) => set((state) => updateEditor(state, state.activeImageId, { crop,
     ...(selectActiveEditor(state).viewMode === "fill" ? { lastFillCrop: crop } : {}) })),
-  setFocalPoint: (point) => set((state) => updateEditor(state, state.activeImageId, { focalPoint: clampFocalPoint(point) })),
+  setFocalPoint: (point) => set((state) => updateEditor(state, state.activeImageId, { focalPoint: clampFocalPoint(point) }, true)),
   resetFocalPoint: () => set((state) => updateEditor(state, state.activeImageId, { focalPoint: { x: 0.5, y: 0.5 } })),
   resetPosition: () => set((state) => updateEditor(state, state.activeImageId, { crop: { x: 0, y: 0 }, focalPoint: { x: 0.5, y: 0.5 }, lastFillCrop: { x: 0, y: 0 } })),
   setZoom: (value) => set((state) => {
     const editor = selectActiveEditor(state);
     const zoom = Number.isFinite(value) ? Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value)) : editor.zoom;
-    return updateEditor(state, state.activeImageId, { zoom, ...(editor.viewMode === "fill" ? { lastFillZoom: zoom } : {}) });
+    return updateEditor(state, state.activeImageId, { zoom, ...(editor.viewMode === "fill" ? { lastFillZoom: zoom } : {}) }, true);
   }),
   setViewMode: (viewMode) => set((state) => {
     const editor = selectActiveEditor(state);
     if (viewMode === editor.viewMode) return state;
     return updateEditor(state, state.activeImageId, viewMode === "fit"
       ? { viewMode, crop: { x: 0, y: 0 }, zoom: MIN_ZOOM, lastFillCrop: editor.crop, lastFillZoom: editor.zoom }
-      : { viewMode, crop: editor.lastFillCrop, zoom: editor.lastFillZoom });
+      : { viewMode, crop: editor.lastFillCrop, zoom: editor.lastFillZoom }, true);
   }),
   resetZoom: () => set((state) => updateEditor(state, state.activeImageId, { zoom: MIN_ZOOM,
     ...(selectActiveEditor(state).viewMode === "fill" ? { lastFillZoom: MIN_ZOOM } : {}) })),
   resetEditor: () => set((state) => ({ ...ratioUpdate(state, createImageEditorState()),
+    batchImages: state.batchImages.map((image) => image.id === state.activeImageId ? { ...image, editor: createImageEditorState(), isEdited: false } : image),
     ...(state.batchImages.length <= 1 ? { exportFormat: "png", exportQuality: 0.9,
       exportSize: { preset: "original", customSide: 1920, customAxis: "width" } } : {}) })),
+  resetImage: () => set((state) => ({ batchImages: state.batchImages.map((image) => image.id === state.activeImageId
+    ? { ...image, editor: createImageEditorState(), isEdited: false } : image) })),
 }));

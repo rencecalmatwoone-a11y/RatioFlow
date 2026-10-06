@@ -157,3 +157,34 @@ test("download URLs are revoked after the browser can start the download", () =>
     globalThis.window = originalWindow;
   }
 });
+
+test("HTML image fallback releases its source, handlers and temporary URL after success, decode failure and encoding failure", async () => {
+  const previous = { bitmap: globalThis.createImageBitmap, document: globalThis.document, image: globalThis.Image, create: URL.createObjectURL, revoke: URL.revokeObjectURL };
+  const images = []; const canvases = []; const revoked = [];
+  let failDecode = false; let failEncode = false;
+  globalThis.createImageBitmap = undefined;
+  URL.createObjectURL = () => "blob:fallback-test"; URL.revokeObjectURL = url => revoked.push(url);
+  globalThis.Image = class {
+    constructor() { images.push(this); }
+    set src(value) { this.source = value; queueMicrotask(() => failDecode ? this.onerror() : this.onload()); }
+    removeAttribute(name) { if (name === "src") this.source = null; }
+  };
+  globalThis.document = { createElement() {
+    const canvas = { width: 0, height: 0, getContext: () => ({ drawImage() {} }),
+      toBlob(callback, mime) { callback(failEncode ? null : new Blob(["encoded"], { type: mime })); } };
+    canvases.push(canvas); return canvas;
+  } };
+  const source = { file: new File(["photo"], "photo.png", { type: "image/png" }), imageWidth: 1600, imageHeight: 1000,
+    ratio: { width: 1, height: 1 }, focalPoint: { x: 0.5, y: 0.5 }, zoom: 1, viewMode: "fill", options: { format: "png", quality: 0.9 } };
+  try {
+    await exportImage(source);
+    failDecode = true; await assert.rejects(exportImage(source), /decoding failed/);
+    failDecode = false; failEncode = true; await assert.rejects(exportImage(source), /encoding failed/);
+    assert.equal(revoked.length, 3);
+    assert.ok(images.every(image => image.source === null && image.onload === null && image.onerror === null));
+    assert.ok(canvases.every(canvas => canvas.width === 0 && canvas.height === 0));
+  } finally {
+    globalThis.createImageBitmap = previous.bitmap; globalThis.document = previous.document; globalThis.Image = previous.image;
+    URL.createObjectURL = previous.create; URL.revokeObjectURL = previous.revoke;
+  }
+});

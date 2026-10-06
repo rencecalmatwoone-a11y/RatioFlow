@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { downloadFile } from "@/lib/downloadFile";
 import { downloadZip } from "@/lib/downloadZip";
 import { exportMultiple } from "@/lib/exportMultiple";
-import { exportBatchImages, snapshotBatchExport } from "@/lib/exportBatchImages";
+import { exportBatchImages, snapshotBatchExport, type BatchExportProgress } from "@/lib/exportBatchImages";
 import { exportZipFilename } from "@/lib/fileName";
 import { getActiveRatio, RATIOS, type RatioId } from "@/lib/ratios";
 import { requestedLongestSide } from "@/lib/exportDimensions";
@@ -10,10 +10,14 @@ import { getPlatformPresetById } from "@/constants/platformPresets";
 import { selectActiveImage, useEditorStore } from "@/store/editorStore";
 
 type ExportScope = "current" | "selected" | "all" | "batch";
+export type ExportPhase = "idle" | "preparing" | "exporting" | "zipping" | "success" | "error";
 
 export function useImageExport() {
   const isExporting = useEditorStore((state) => state.isExporting);
   const [exportScope, setExportScope] = useState<ExportScope | null>(null);
+  const [phase, setPhase] = useState<ExportPhase>("idle");
+  const [progress, setProgress] = useState<BatchExportProgress | null>(null);
+  const [announcement, setAnnouncement] = useState("");
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const feedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -42,18 +46,35 @@ export function useImageExport() {
     state.setIsExporting(true);
     if (feedbackTimer.current !== null) clearTimeout(feedbackTimer.current);
     setExportScope(scope);
+    setPhase("preparing");
+    setProgress(null);
+    setAnnouncement(scope === "batch" ? "Preparing batch." : "Preparing image.");
     setError(null);
     setStatus(scope === "batch" ? "Preparing batch..." : "Exporting...");
     let downloaded = false;
+    let fileCount = ratioIds.length;
     try {
       if (scope === "batch") {
         const snapshot = snapshotBatchExport(state);
+        fileCount = snapshot.images.length * snapshot.ratioIds.length;
+        let announcedBucket = -1;
         const blob = await exportBatchImages(snapshot, (progress) => {
-          if (mounted.current) setStatus(progress.phase === "zip" ? "Creating ZIP..."
-            : `Exporting ${progress.completed} of ${progress.total} · Image ${progress.imageIndex} of ${progress.imageCount}...`);
+          if (!mounted.current) return;
+          setPhase(progress.phase);
+          setProgress(progress);
+          const message = progress.phase === "zipping" ? `Creating ZIP · ${progress.completed} of ${progress.total} files.`
+            : `Exporting ${progress.completed} of ${progress.total} · Image ${progress.imageIndex} of ${progress.imageCount} · ${progress.imageName} · ${progress.ratioLabel}`;
+          setStatus(message);
+          const bucket = Math.floor(progress.completed / progress.total * 10);
+          // Announce phase changes and completed 10% steps, rather than every render or percentage point.
+          if (progress.phase === "zipping" || bucket > announcedBucket) {
+            announcedBucket = bucket;
+            setAnnouncement(message);
+          }
         });
         downloadFile(blob, "ratioflow-batch-export.zip");
       } else {
+        if (mounted.current) setPhase("exporting");
         const config = scope === "selected"
           ? state.exportRatioConfiguration : { customRatio: editor.customRatio, platformPresetId: editor.activePlatformPresetId };
         const presetDimensions = getPlatformPresetById(state.exportSize.preset === "preset"
@@ -72,21 +93,27 @@ export function useImageExport() {
         });
         if (files.length === 1) downloadFile(files[0].blob, files[0].name);
         else {
-          if (mounted.current) setStatus("Creating ZIP...");
+          if (mounted.current) { setStatus("Creating ZIP..."); setPhase("zipping"); }
           await downloadZip(files, exportZipFilename(image.name));
         }
       }
       downloaded = true;
-      if (mounted.current) setStatus(scope === "batch" ? "Batch downloaded" : "Downloaded");
+      if (mounted.current) {
+        const message = scope === "batch" ? `${fileCount} files downloaded.` : "Downloaded";
+        setPhase("success"); setStatus(message); setAnnouncement(message);
+      }
     } catch (failure) {
-      if (mounted.current) setError(scope === "batch" && failure instanceof Error
-        ? failure.message : "Could not export this image. Please try again.");
+      if (mounted.current) {
+        setPhase("error");
+        const message = scope === "batch" && failure instanceof Error
+          ? failure.message : "Could not export this image. Please try again.";
+        setError(message); setAnnouncement("");
+      }
     } finally {
       useEditorStore.getState().setIsExporting(false);
       if (mounted.current) {
-        setExportScope(null);
-        if (downloaded) feedbackTimer.current = setTimeout(() => setStatus(null), 3000);
-        else setStatus(null);
+        if (!downloaded) setStatus(null);
+        else if (scope !== "batch") feedbackTimer.current = setTimeout(() => { setStatus(null); setPhase("idle"); }, 3000);
       }
     }
   }
@@ -94,6 +121,6 @@ export function useImageExport() {
   return {
     downloadCurrent: () => runExport("current"), downloadSelected: () => runExport("selected"),
     downloadAll: () => runExport("all"), downloadBatch: () => runExport("batch"),
-    isExporting, exportScope, status, error, clearError: () => setError(null),
+    isExporting, exportScope, phase, progress, announcement, status, error, clearError: () => setError(null),
   };
 }
