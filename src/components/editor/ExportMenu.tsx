@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useImageExport } from "@/hooks/useImageExport";
 import { getPlatformName, getPlatformPresetById } from "@/constants/platformPresets";
 import { getActiveRatio, RATIOS, type RatioId } from "@/lib/ratios";
-import { useEditorStore } from "@/store/editorStore";
+import { useEditorStore, selectActiveEditor } from "@/store/editorStore";
 import type { ExportFormat } from "@/types/editor";
 import { ExportSelect, type ExportSelectOption } from "./ExportSelect";
 import { OutputSizeControl } from "./OutputSizeControl";
@@ -21,27 +21,33 @@ export function ExportMenu() {
   const trigger = useRef<HTMLButtonElement>(null);
   const exportFormat = useEditorStore((state) => state.exportFormat);
   const exportQuality = useEditorStore((state) => state.exportQuality);
+  const imageCount = useEditorStore((state) => state.batchImages.length);
+  const isPreparingImages = useEditorStore((state) => state.isPreparingImages);
+  const ratioConfiguration = useEditorStore((state) => state.exportRatioConfiguration);
   const setExportFormat = useEditorStore((state) => state.setExportFormat);
   const setExportQuality = useEditorStore((state) => state.setExportQuality);
   const selectedExportRatios = useEditorStore((state) => state.selectedExportRatios);
-  const selectedRatioId = useEditorStore((state) => state.selectedRatioId);
-  const customRatio = useEditorStore((state) => state.customRatio);
-  const activePlatformPresetId = useEditorStore((state) => state.activePlatformPresetId);
+  const selectedRatioId = useEditorStore((state) => selectActiveEditor(state).selectedRatioId);
+  const customRatio = useEditorStore((state) => selectActiveEditor(state).customRatio);
+  const activePlatformPresetId = useEditorStore((state) => selectActiveEditor(state).activePlatformPresetId);
   const toggleExportRatio = useEditorStore((state) => state.toggleExportRatio);
   const selectAllExportRatios = useEditorStore((state) => state.selectAllExportRatios);
   const clearExportRatios = useEditorStore((state) => state.clearExportRatios);
-  const { downloadCurrent, downloadSelected, downloadAll, isExporting, status, error, clearError } = useImageExport();
+  const { downloadCurrent, downloadSelected, downloadAll, downloadBatch, isExporting, exportScope, status, error, clearError } = useImageExport();
+  const busy = isExporting || isPreparingImages;
   const activeRatio = getActiveRatio(selectedRatioId, customRatio, activePlatformPresetId);
   const activePlatformPreset = getPlatformPresetById(activePlatformPresetId);
+  const dynamicIds = (["free", "custom", "platform"] as const).filter((id) => selectedRatioId === id || selectedExportRatios.includes(id));
   const exportRatios: { id: RatioId; label: string; dynamic?: boolean }[] = [
     ...RATIOS,
-    ...(selectedRatioId === "free" || selectedRatioId === "custom" || selectedRatioId === "platform" ? [{
-      id: selectedRatioId,
-      label: selectedRatioId === "platform" && activePlatformPreset
-        ? `${getPlatformName(activePlatformPreset.platform)} · ${activePlatformPreset.name} (${activeRatio.label})`
-        : selectedRatioId === "free" ? "Free · original image ratio" : `Custom · ${activeRatio.label}`,
-      dynamic: true,
-    }] : []),
+    ...dynamicIds.map((id) => {
+      const shared = selectedExportRatios.includes(id);
+      const preset = shared ? getPlatformPresetById(ratioConfiguration.platformPresetId) : activePlatformPreset;
+      const ratio = shared ? getActiveRatio(id, ratioConfiguration.customRatio, ratioConfiguration.platformPresetId) : activeRatio;
+      return { id, label: id === "platform" && preset
+        ? `${getPlatformName(preset.platform)} · ${preset.name} (${ratio.label})`
+        : id === "free" ? "Free · original image ratio" : `Custom · ${ratio.label}`, dynamic: true };
+    }),
   ];
 
   useEffect(() => {
@@ -75,13 +81,13 @@ export function ExportMenu() {
           <button
             type="button"
             onClick={() => { clearError(); void downloadCurrent(); }}
-            disabled={isExporting || !sizeValid}
+            disabled={busy || !sizeValid}
             className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-[#1e1e1e] px-5 text-sm font-medium text-white shadow-[0_5px_16px_rgba(0,0,0,0.12)] transition-[background-color,transform,box-shadow] duration-150 hover:-translate-y-0.5 hover:bg-[#383838] hover:shadow-[0_7px_18px_rgba(0,0,0,0.16)] active:translate-y-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#181818] disabled:cursor-wait disabled:opacity-60 motion-reduce:transform-none motion-reduce:transition-none"
           >
             <svg aria-hidden="true" viewBox="0 0 16 16" fill="none" className="h-4 w-4">
               <path d="M8 2.5v8m0 0 3-3m-3 3-3-3M3 12.5h10" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            {isExporting ? "Preparing image..." : "Download Image"}
+            {isExporting && exportScope !== "batch" ? "Preparing image..." : "Download Image"}
           </button>
           <p role="status" aria-live="polite" className="mt-2 text-center text-xs text-[#62625e] empty:hidden">{status}</p>
           <p role="alert" className="mt-2 text-center text-xs text-[#a54747] empty:hidden">{error}</p>
@@ -103,6 +109,17 @@ export function ExportMenu() {
           Options
         </button>
       </div>
+      {imageCount > 1 && (
+        <div className="mt-3 flex w-full max-w-[350px] flex-col items-center">
+          <button type="button" onClick={() => { clearError(); void downloadBatch(); }}
+            disabled={busy || !sizeValid || selectedExportRatios.length === 0}
+            className="min-h-12 w-full rounded-full border border-[#d7d7d2] bg-white px-5 text-sm font-medium text-[#343430] hover:bg-[#efefed] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#181818] disabled:opacity-50">
+            {isExporting && exportScope === "batch" ? "Preparing batch..." : "Download Batch"}
+          </button>
+          <p className="mt-2 text-center text-[11px] text-[#777]">{imageCount} images · {selectedExportRatios.length} {selectedExportRatios.length === 1 ? "ratio" : "ratios"} · {imageCount * selectedExportRatios.length} files will be exported</p>
+          <p className="mt-1 text-center text-[11px] text-[#858580]">Choose batch ratios in Options.</p>
+        </div>
+      )}
       {mounted && (
         <div
           id="export-options"
@@ -163,10 +180,11 @@ export function ExportMenu() {
                 </div>
               </fieldset>
               <div className="mt-3 space-y-2">
+                {imageCount > 1 && <p className="text-xs text-[#777]">These actions download the active image.</p>}
                 <button
                   type="button"
                   onClick={() => void downloadCurrent()}
-                  disabled={isExporting || !sizeValid}
+                  disabled={busy || !sizeValid}
                   className="min-h-11 w-full rounded-full bg-[#1e1e1e] px-4 text-sm font-medium text-white transition-colors duration-150 hover:bg-[#383838] disabled:cursor-wait disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#181818] motion-reduce:transition-none"
                 >
                   {isExporting ? "Exporting..." : "Download Current"}
@@ -174,7 +192,7 @@ export function ExportMenu() {
                 <button
                   type="button"
                   onClick={() => void downloadSelected()}
-                  disabled={isExporting || !sizeValid || selectedExportRatios.length === 0}
+                  disabled={busy || !sizeValid || selectedExportRatios.length === 0}
                   className="min-h-11 w-full rounded-full border border-[#dededb] px-4 text-sm font-medium transition-colors duration-150 hover:bg-[#f5f5f3] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#181818] motion-reduce:transition-none"
                 >
                   Download Selected
@@ -182,7 +200,7 @@ export function ExportMenu() {
                 <button
                   type="button"
                   onClick={() => void downloadAll()}
-                  disabled={isExporting || !sizeValid}
+                  disabled={busy || !sizeValid}
                   className="min-h-11 w-full rounded-full border border-[#dededb] px-4 text-sm font-medium transition-colors duration-150 hover:bg-[#f5f5f3] disabled:cursor-wait disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#181818] motion-reduce:transition-none"
                 >
                   Download All

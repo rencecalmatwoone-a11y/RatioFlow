@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { getPlatformName, getPlatformPresetById, getPresetsByPlatform, PLATFORMS } from "@/constants/platformPresets";
 import { ratioLabel } from "@/lib/ratioMath";
-import { useEditorStore } from "@/store/editorStore";
+import { useEditorStore, selectActiveEditor } from "@/store/editorStore";
 import type { PlatformId } from "@/types/editor";
 
 export function PlatformPresetSelector() {
@@ -10,7 +10,7 @@ export function PlatformPresetSelector() {
   const [platform, setPlatform] = useState<PlatformId>("instagram");
   const container = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
-  const activeId = useEditorStore((state) => state.activePlatformPresetId);
+  const activeId = useEditorStore((state) => selectActiveEditor(state).activePlatformPresetId);
   const selectPreset = useEditorStore((state) => state.setActivePlatformPreset);
   const active = getPlatformPresetById(activeId);
 

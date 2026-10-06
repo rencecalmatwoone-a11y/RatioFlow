@@ -1,28 +1,21 @@
 import { useDropzone } from "react-dropzone";
-import { IMAGE_ACCEPT, IMAGE_ERRORS, MAX_IMAGE_SIZE } from "@/hooks/useImage";
+import { IMAGE_ACCEPT, MAX_FILE_SIZE } from "@/constants/batchLimits";
 
 interface UploadAreaProps {
-  onImage: (file: File) => void;
-  onError: (message: string) => void;
-  error: string | null;
+  onImages: (files: File[]) => void;
+  status: string | null;
   isLoading: boolean;
 }
 
-export function UploadArea({ onImage, onError, error, isLoading }: UploadAreaProps) {
+export function UploadArea({ onImages, status, isLoading }: UploadAreaProps) {
   const { getRootProps, getInputProps, isDragActive, isDragReject, open } = useDropzone({
     accept: IMAGE_ACCEPT,
-    maxSize: MAX_IMAGE_SIZE,
-    multiple: false,
+    maxSize: MAX_FILE_SIZE,
+    multiple: true,
+    disabled: isLoading,
     noClick: true,
     noKeyboard: true,
-    onDropAccepted: ([file]) => {
-      if (file) onImage(file);
-    },
-    onDropRejected: ([rejection]) => {
-      const tooLarge = rejection?.errors.some((item) => item.code === "file-too-large");
-      const tooMany = rejection?.errors.some((item) => item.code === "too-many-files");
-      onError(tooMany ? "Choose one image at a time." : tooLarge ? IMAGE_ERRORS.size : IMAGE_ERRORS.type);
-    },
+    onDrop: (accepted, rejected) => onImages([...accepted, ...rejected.map((item) => item.file)]),
   });
 
   return (
@@ -39,16 +32,15 @@ export function UploadArea({ onImage, onError, error, isLoading }: UploadAreaPro
         </svg>
       </div>
       <h2 id="upload-title" className="text-xl font-medium tracking-[-0.03em] text-[#181818]">
-        {isDragReject ? "Unsupported image format" : isDragActive ? "Drop to open image" : "Drop an image here"}
+        {isDragReject ? "Use JPEG, PNG, or WebP" : isDragActive ? "Drop to open images" : "Drop images here"}
       </h2>
-      <p className="mt-2 text-sm text-[#858585]">or choose an image</p>
+      <p className="mt-2 text-sm text-[#858585]">or choose one or more images</p>
       <button type="button" onClick={open} disabled={isLoading} className="mt-7 min-h-11 rounded-full bg-[#1e1e1e] px-6 text-sm font-medium text-white transition-opacity hover:opacity-85 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#181818] disabled:opacity-70">
-        {isLoading ? "Opening image…" : "Choose Image"}
+        {isLoading ? "Opening images…" : "Choose Images"}
       </button>
       <p className="mt-4 text-[11px] font-medium tracking-[0.08em] text-[#73736d]" aria-label="Supported formats: PNG, JPG, and WebP">PNG · JPG · WEBP</p>
-      {isLoading && <p role="status" className="mt-4 text-sm text-[#62625e]">Preparing image...</p>}
-      {error && <p role="status" className="mt-4 text-sm text-[#a54747]">{error}</p>}
-      <p className="mt-7 text-xs text-[#858585]">Processed locally. Your image never leaves your device.</p>
+      <p role="status" aria-live="polite" className="mt-4 text-sm text-[#62625e] empty:hidden">{status}</p>
+      <p className="mt-7 text-xs text-[#858585]">Processed locally. Your images never leave your device.</p>
     </section>
   );
 }

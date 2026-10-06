@@ -3,7 +3,7 @@ import { calculateExportGeometry } from "@/lib/exportImage";
 import { dimensionsFromSide, MAX_EXPORT_DIMENSION, MIN_OUTPUT_DIMENSION, parseOutputInput, requestedLongestSide } from "@/lib/exportDimensions";
 import { getActiveRatio } from "@/lib/ratios";
 import { getPlatformPresetById, getPlatformName } from "@/constants/platformPresets";
-import { useEditorStore } from "@/store/editorStore";
+import { useEditorStore, selectActiveEditor, selectActiveImage } from "@/store/editorStore";
 import type { ExportSizePreset } from "@/types/editor";
 import { ExportSelect, type ExportSelectOption } from "./ExportSelect";
 
@@ -11,13 +11,14 @@ export function OutputSizeControl({ onValidityChange }: { onValidityChange: (val
   const size = useEditorStore((state) => state.exportSize);
   const setPreset = useEditorStore((state) => state.setExportSizePreset);
   const setCustomSide = useEditorStore((state) => state.setCustomExportSide);
-  const ratioId = useEditorStore((state) => state.selectedRatioId);
-  const customRatio = useEditorStore((state) => state.customRatio);
-  const activePlatformPresetId = useEditorStore((state) => state.activePlatformPresetId);
-  const imageWidth = useEditorStore((state) => state.imageWidth);
-  const imageHeight = useEditorStore((state) => state.imageHeight);
-  const zoom = useEditorStore((state) => state.zoom);
-  const viewMode = useEditorStore((state) => state.viewMode);
+  const ratioId = useEditorStore((state) => selectActiveEditor(state).selectedRatioId);
+  const customRatio = useEditorStore((state) => selectActiveEditor(state).customRatio);
+  const activePlatformPresetId = useEditorStore((state) => selectActiveEditor(state).activePlatformPresetId);
+  const sharedPresetId = useEditorStore((state) => state.exportSize.platformPresetId ?? state.exportRatioConfiguration.platformPresetId);
+  const imageWidth = useEditorStore((state) => selectActiveImage(state)?.width);
+  const imageHeight = useEditorStore((state) => selectActiveImage(state)?.height);
+  const zoom = useEditorStore((state) => selectActiveEditor(state).zoom);
+  const viewMode = useEditorStore((state) => selectActiveEditor(state).viewMode);
   const [draft, setDraft] = useState<string | null>(null);
   const [error, setError] = useState("");
   useEffect(() => {
@@ -25,10 +26,11 @@ export function OutputSizeControl({ onValidityChange }: { onValidityChange: (val
     setError("");
     onValidityChange(true);
   }, [size.preset, onValidityChange]);
-  const activePreset = getPlatformPresetById(activePlatformPresetId);
+  const activePreset = getPlatformPresetById(activePlatformPresetId) ?? getPlatformPresetById(sharedPresetId);
+  const outputPreset = size.preset === "preset" ? getPlatformPresetById(sharedPresetId) ?? activePreset : activePreset;
   const sizeOptions: ExportSelectOption<ExportSizePreset>[] = [
     { value: "original", label: "Original / Maximum", detail: "Largest available size" },
-    ...(activePreset ? [{ value: "preset" as const, label: `${getPlatformName(activePreset.platform)} · ${activePreset.name}`, detail: `${activePreset.width} × ${activePreset.height}` }] : []),
+    ...(outputPreset ? [{ value: "preset" as const, label: `${getPlatformName(outputPreset.platform)} · ${outputPreset.name}`, detail: `${outputPreset.width} × ${outputPreset.height}` }] : []),
     { value: "1080", label: "1080px", detail: "Longest side" },
     { value: "1440", label: "1440px", detail: "Longest side" },
     { value: "2160", label: "2160px", detail: "Longest side" },
@@ -39,12 +41,12 @@ export function OutputSizeControl({ onValidityChange }: { onValidityChange: (val
   let geometry = null;
   try {
     geometry = imageWidth && imageHeight
-      ? calculateExportGeometry(imageWidth, imageHeight, ratio, { x: 0.5, y: 0.5 }, zoom, viewMode, size, undefined, activePreset)
+      ? calculateExportGeometry(imageWidth, imageHeight, ratio, { x: 0.5, y: 0.5 }, zoom, viewMode, size, undefined, outputPreset)
       : null;
   } catch {
     // The export path will reject an image too small for the selected ratio.
   }
-  const limit = geometry && (requestedLongestSide(ratio, size, activePreset) ?? 0) > Math.max(geometry.outputWidth, geometry.outputHeight);
+  const limit = geometry && (requestedLongestSide(ratio, size, outputPreset) ?? 0) > Math.max(geometry.outputWidth, geometry.outputHeight);
 
   function edit(value: string, axis: "width" | "height") {
     setDraft(value);

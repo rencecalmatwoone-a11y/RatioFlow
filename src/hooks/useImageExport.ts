@@ -2,108 +2,98 @@ import { useEffect, useRef, useState } from "react";
 import { downloadFile } from "@/lib/downloadFile";
 import { downloadZip } from "@/lib/downloadZip";
 import { exportMultiple } from "@/lib/exportMultiple";
+import { exportBatchImages, snapshotBatchExport } from "@/lib/exportBatchImages";
 import { exportZipFilename } from "@/lib/fileName";
-import { RATIOS, type RatioId } from "@/lib/ratios";
+import { getActiveRatio, RATIOS, type RatioId } from "@/lib/ratios";
+import { requestedLongestSide } from "@/lib/exportDimensions";
 import { getPlatformPresetById } from "@/constants/platformPresets";
-import { useEditorStore } from "@/store/editorStore";
+import { selectActiveImage, useEditorStore } from "@/store/editorStore";
+
+type ExportScope = "current" | "selected" | "all" | "batch";
 
 export function useImageExport() {
-  const [isExporting, setIsExporting] = useState(false);
+  const isExporting = useEditorStore((state) => state.isExporting);
+  const [exportScope, setExportScope] = useState<ExportScope | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const inProgress = useRef(false);
   const feedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mounted = useRef(true);
 
-  useEffect(() => () => {
-    if (feedbackTimer.current !== null) clearTimeout(feedbackTimer.current);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      if (feedbackTimer.current !== null) clearTimeout(feedbackTimer.current);
+    };
   }, []);
 
-  async function runExport(ratioIds: readonly RatioId[], currentOnly: boolean) {
-    if (inProgress.current) return;
+  async function runExport(scope: ExportScope) {
     const state = useEditorStore.getState();
-    if (!state.imageFile || !state.imageWidth || !state.imageHeight || !state.imageName) {
-      setError("Choose an image before exporting.");
-      return;
-    }
-    if (ratioIds.length === 0) {
-      setError("Select at least one ratio.");
-      return;
-    }
+    if (state.isExporting || state.isPreparingImages) return;
+    const image = selectActiveImage(state);
+    if (!image) { setError("Choose an image before exporting."); return; }
+    const editor = image.editor;
+    const ratioIds: RatioId[] = scope === "current" ? [editor.selectedRatioId]
+      : scope === "all" ? [...RATIOS.map((ratio) => ratio.id),
+        ...(["free", "custom", "platform"].includes(editor.selectedRatioId) ? [editor.selectedRatioId] : [])]
+      : [...state.selectedExportRatios];
+    if (!ratioIds.length) { setError("Select at least one ratio."); return; }
 
-    inProgress.current = true;
+    state.setIsExporting(true);
     if (feedbackTimer.current !== null) clearTimeout(feedbackTimer.current);
-    setIsExporting(true);
+    setExportScope(scope);
     setError(null);
-    setStatus(ratioIds.length === 1 ? "Exporting..." : `Exporting 1 of ${ratioIds.length}...`);
-    const source = {
-      file: state.imageFile,
-      imageWidth: state.imageWidth,
-      imageHeight: state.imageHeight,
-      imageName: state.imageName,
-      focalPoint: state.focalPoint,
-      zoom: state.zoom,
-      viewMode: state.viewMode,
-      options: { format: state.exportFormat, quality: state.exportQuality },
-      exportSize: state.exportSize,
-      presetDimensions: getPlatformPresetById(state.activePlatformPresetId),
-      platformPresetId: state.activePlatformPresetId ?? undefined,
-      customRatio: state.customRatio,
-      currentRatio: state.selectedRatioId,
-      multiRatio: !currentOnly && ratioIds.length > 1,
-    };
-
+    setStatus(scope === "batch" ? "Preparing batch..." : "Exporting...");
     let downloaded = false;
     try {
-      let files;
-      try {
-        files = await exportMultiple(source, ratioIds, (current, total) => {
-          setStatus(total === 1 ? "Exporting..." : `Exporting ${current} of ${total}...`);
+      if (scope === "batch") {
+        const snapshot = snapshotBatchExport(state);
+        const blob = await exportBatchImages(snapshot, (progress) => {
+          if (mounted.current) setStatus(progress.phase === "zip" ? "Creating ZIP..."
+            : `Exporting ${progress.completed} of ${progress.total} · Image ${progress.imageIndex} of ${progress.imageCount}...`);
         });
-      } catch {
-        setError(currentOnly ? "Could not export this image. Please try again." : "Could not export all selected ratios. Please try again.");
-        return;
-      }
-
-      if (files.length === 1) {
-        try {
-          downloadFile(files[0].blob, files[0].name);
-          downloaded = true;
-          setStatus("Downloaded");
-        } catch {
-          setError("Could not download this image. Please try again.");
-        }
+        downloadFile(blob, "ratioflow-batch-export.zip");
       } else {
-        setStatus("Creating ZIP...");
-        try {
-          await downloadZip(files, exportZipFilename(source.imageName));
-          downloaded = true;
-          setStatus("Downloaded");
-        } catch {
-          setError("Could not create the ZIP file. Please try again.");
+        const config = scope === "selected"
+          ? state.exportRatioConfiguration : { customRatio: editor.customRatio, platformPresetId: editor.activePlatformPresetId };
+        const presetDimensions = getPlatformPresetById(state.exportSize.preset === "preset"
+          ? state.exportSize.platformPresetId ?? state.exportRatioConfiguration.platformPresetId : config.platformPresetId);
+        const longestSideOverride = scope !== "current" && ratioIds.length > 1 && (state.exportSize.preset === "custom" || state.exportSize.preset === "preset")
+          ? requestedLongestSide(getActiveRatio(editor.selectedRatioId, editor.customRatio, editor.activePlatformPresetId), state.exportSize, presetDimensions) ?? undefined
+          : undefined;
+        const files = await exportMultiple({
+          file: image.file, imageWidth: image.width, imageHeight: image.height, imageName: image.name,
+          focalPoint: { ...editor.focalPoint }, zoom: editor.zoom, viewMode: editor.viewMode,
+          options: { format: state.exportFormat, quality: state.exportQuality }, exportSize: { ...state.exportSize },
+          presetDimensions, longestSideOverride, platformPresetId: config.platformPresetId ?? undefined,
+          customRatio: { ...config.customRatio }, currentRatio: editor.selectedRatioId, multiRatio: scope !== "current" && ratioIds.length > 1,
+        }, ratioIds, (current, total) => {
+          if (mounted.current) setStatus(total === 1 ? "Exporting..." : `Exporting ${current} of ${total}...`);
+        });
+        if (files.length === 1) downloadFile(files[0].blob, files[0].name);
+        else {
+          if (mounted.current) setStatus("Creating ZIP...");
+          await downloadZip(files, exportZipFilename(image.name));
         }
       }
-    } catch {
-      setError("Could not export this image. Please try again.");
+      downloaded = true;
+      if (mounted.current) setStatus(scope === "batch" ? "Batch downloaded" : "Downloaded");
+    } catch (failure) {
+      if (mounted.current) setError(scope === "batch" && failure instanceof Error
+        ? failure.message : "Could not export this image. Please try again.");
     } finally {
-      inProgress.current = false;
-      setIsExporting(false);
-      if (downloaded) feedbackTimer.current = setTimeout(() => setStatus(null), 3000);
-      else setStatus(null);
+      useEditorStore.getState().setIsExporting(false);
+      if (mounted.current) {
+        setExportScope(null);
+        if (downloaded) feedbackTimer.current = setTimeout(() => setStatus(null), 3000);
+        else setStatus(null);
+      }
     }
   }
 
   return {
-    downloadCurrent: () => runExport([useEditorStore.getState().selectedRatioId], true),
-    downloadSelected: () => runExport([...useEditorStore.getState().selectedExportRatios], false),
-    downloadAll: () => {
-      const current = useEditorStore.getState().selectedRatioId;
-      const ratioIds: RatioId[] = RATIOS.map((ratio) => ratio.id);
-      if (current === "free" || current === "custom" || current === "platform") ratioIds.push(current);
-      return runExport(ratioIds, false);
-    },
-    isExporting,
-    status,
-    error,
-    clearError: () => setError(null),
+    downloadCurrent: () => runExport("current"), downloadSelected: () => runExport("selected"),
+    downloadAll: () => runExport("all"), downloadBatch: () => runExport("batch"),
+    isExporting, exportScope, status, error, clearError: () => setError(null),
   };
 }

@@ -40,39 +40,65 @@ export type SafeZonePreset = {
   safeFrame?: SafeZoneRegion;
 };
 export type ExportSizePreset = "original" | "preset" | "1080" | "1440" | "2160" | "custom";
-export type ExportSize = { preset: ExportSizePreset; customSide: number; customAxis: "width" | "height" };
+export type ExportSize = { preset: ExportSizePreset; customSide: number; customAxis: "width" | "height"; platformPresetId?: string | null };
 
 export type ExportOptions = {
   format: ExportFormat;
   quality: number;
 };
 
-export interface EditorState {
-  imageFile: File | null;
-  imageUrl: string | null;
-  imageWidth: number | null;
-  imageHeight: number | null;
-  imageName: string | null;
+export type ImageEditorState = {
   selectedRatioId: RatioId;
   activePlatformPresetId: string | null;
   showSafeZone: boolean;
   customRatio: CustomRatio;
   isManualRatio: boolean;
   manualFrameWidth: number | null;
-  selectedExportRatios: RatioId[];
   crop: CropPosition;
   focalPoint: FocalPoint;
   zoom: number;
-  minZoom: number;
-  maxZoom: number;
   viewMode: ViewMode;
   lastFillCrop: CropPosition;
   lastFillZoom: number;
+};
+
+export type BatchImageItem = {
+  id: string;
+  file: File;
+  objectUrl: string;
+  name: string;
+  width: number;
+  height: number;
+  size: number;
+  editor: ImageEditorState;
+};
+
+export type ExportRatioConfiguration = {
+  customRatio: CustomRatio;
+  platformPresetId: string | null;
+};
+
+export interface EditorState {
+  batchImages: BatchImageItem[];
+  activeImageId: string | null;
+  minZoom: number;
+  maxZoom: number;
+  isPreparingImages: boolean;
+  isExporting: boolean;
+  selectedExportRatios: RatioId[];
+  exportRatioConfiguration: ExportRatioConfiguration;
   exportFormat: ExportFormat;
   exportQuality: number;
   exportSize: ExportSize;
-  setImage: (file: File, url: string, width: number, height: number) => void;
-  clearImage: () => void;
+  addImages: (images: BatchImageItem[]) => void;
+  replaceImage: (id: string, image: BatchImageItem) => void;
+  removeImage: (id: string) => void;
+  clearBatch: () => void;
+  setActiveImage: (id: string) => void;
+  updateImageEditorState: (id: string, patch: Partial<ImageEditorState>) => void;
+  applyRatioToAll: () => void;
+  setIsPreparingImages: (preparing: boolean) => void;
+  setIsExporting: (exporting: boolean) => void;
   setSelectedRatio: (ratioId: RatioPresetId | "free" | "custom") => void;
   resetEditor: () => void;
   setActivePlatformPreset: (id: string) => void;

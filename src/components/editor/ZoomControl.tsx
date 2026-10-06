@@ -1,11 +1,11 @@
 import { useLayoutEffect, useRef } from "react";
-import { useEditorStore } from "@/store/editorStore";
+import { useEditorStore, selectActiveEditor } from "@/store/editorStore";
 
 export function ZoomControl() {
-  const zoom = useEditorStore((state) => state.zoom);
+  const zoom = useEditorStore((state) => selectActiveEditor(state).zoom);
   const minZoom = useEditorStore((state) => state.minZoom);
   const maxZoom = useEditorStore((state) => state.maxZoom);
-  const viewMode = useEditorStore((state) => state.viewMode);
+  const viewMode = useEditorStore((state) => selectActiveEditor(state).viewMode);
   const setZoom = useEditorStore((state) => state.setZoom);
   const setViewMode = useEditorStore((state) => state.setViewMode);
   const resetZoom = useEditorStore((state) => state.resetZoom);

@@ -5,6 +5,6 @@ export async function downloadZip(files: readonly GeneratedExport[], filename: s
   const { default: JSZip } = await import("jszip");
   const zip = new JSZip();
   for (const file of files) zip.file(file.name, file.blob);
-  const blob = await zip.generateAsync({ type: "blob" });
+  const blob = await zip.generateAsync({ type: "blob", compression: "STORE" });
   downloadFile(blob, filename);
 }

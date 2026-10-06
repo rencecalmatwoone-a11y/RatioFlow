@@ -55,6 +55,7 @@ try {
   await send("Emulation.setDeviceMetricsOverride", { width: 1200, height: 900, deviceScaleFactor: 1, mobile: false });
   await send("Page.navigate", { url: appUrl });
   await waitFor(`document.body?.textContent.includes('Choose Image')`);
+  await waitFor(`!!document.querySelector('input[type=file]') && Object.keys(document.querySelector('input[type=file]')).some(key => key.startsWith('__reactProps'))`);
   await evaluate(`(async () => {
     const canvas = document.createElement('canvas');
     canvas.width = 1600; canvas.height = 1200;

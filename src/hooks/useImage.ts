@@ -1,131 +1,53 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { prepareBatchImages, selectActiveImage, type ImageImportIssue } from "@/lib/batchImages";
 import { useEditorStore } from "@/store/editorStore";
 
-export const MAX_IMAGE_SIZE = 20 * 1024 * 1024;
-export const IMAGE_ACCEPT = {
-  "image/jpeg": [".jpg", ".jpeg"],
-  "image/png": [".png"],
-  "image/webp": [".webp"],
-};
-
-export const IMAGE_ERRORS = {
-  type: "Unsupported file type. Use JPEG, PNG, or WebP.",
-  size: "Image is too large. Maximum size is 20 MB.",
-  empty: "This image file is empty. Choose another file.",
-  decode: "We couldn't read this image. Try another file.",
-};
-
-function decodeWithImage(url: string): Promise<{ width: number; height: number }> {
-  return new Promise((resolve, reject) => {
-    const image = new Image();
-    image.onload = () => resolve({ width: image.naturalWidth, height: image.naturalHeight });
-    image.onerror = () => reject(new Error("Image decoding failed"));
-    image.src = url;
-  });
-}
-
-async function getDimensions(file: File, url: string) {
-  if (typeof createImageBitmap === "function") {
-    try {
-      const bitmap = await createImageBitmap(file);
-      try {
-        return { width: bitmap.width, height: bitmap.height };
-      } finally {
-        bitmap.close();
-      }
-    } catch {
-      // Some browsers cannot decode every supported image through ImageBitmap.
-    }
-  }
-  return decodeWithImage(url);
-}
-
 export function useImage() {
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
+  const [issues, setIssues] = useState<ImageImportIssue[]>([]);
+  const isLoading = useEditorStore((state) => state.isPreparingImages);
   const requestId = useRef(0);
-  const pendingUrl = useRef<string | null>(null);
-  const setImage = useEditorStore((state) => state.setImage);
-  const clearStoredImage = useEditorStore((state) => state.clearImage);
 
-  const clearImage = useCallback(() => {
-    requestId.current += 1;
-    if (pendingUrl.current) {
-      URL.revokeObjectURL(pendingUrl.current);
-      pendingUrl.current = null;
+  const loadImages = useCallback(async (files: readonly File[], replace = false) => {
+    const state = useEditorStore.getState();
+    if (!files.length || state.isExporting || state.isPreparingImages) return;
+    const active = selectActiveImage(state);
+    if (replace && !active) return;
+    const currentRequest = ++requestId.current;
+    state.setIsPreparingImages(true);
+    setIssues([]);
+    setStatus(`Preparing 1 of ${files.length} images...`);
+    try {
+      const result = await prepareBatchImages(replace ? files.slice(0, 1) : files,
+        replace ? state.batchImages.filter((image) => image.id !== active?.id) : state.batchImages,
+        active?.editor, (current, total) => {
+          if (currentRequest === requestId.current) setStatus(`Preparing ${current} of ${total} images...`);
+        }, () => currentRequest !== requestId.current);
+      if (currentRequest !== requestId.current) {
+        result.images.forEach((image) => URL.revokeObjectURL(image.objectUrl));
+        return;
+      }
+      if (replace && active && result.images[0]) state.replaceImage(active.id, result.images[0]);
+      else if (!replace) state.addImages(result.images);
+      setIssues(result.issues);
+      const count = result.images.length;
+      setStatus(`${count} ${count === 1 ? "image" : "images"} ${replace ? "replaced" : "added"}.${result.issues.length
+        ? ` ${result.issues.length} ${result.issues.length === 1 ? "file couldn't" : "files couldn't"} be added.` : ""}`);
+    } catch {
+      if (currentRequest === requestId.current) setStatus("Could not prepare these images. Please try again.");
+    } finally {
+      if (currentRequest === requestId.current) useEditorStore.getState().setIsPreparingImages(false);
     }
-    clearStoredImage();
-    setError(null);
-    setIsLoading(false);
-  }, [clearStoredImage]);
-
-  const reportError = useCallback((message: string) => {
-    requestId.current += 1;
-    if (pendingUrl.current) {
-      URL.revokeObjectURL(pendingUrl.current);
-      pendingUrl.current = null;
-    }
-    setIsLoading(false);
-    setError(message);
   }, []);
 
-  const loadImage = useCallback(async (file: File) => {
-    const currentRequest = ++requestId.current;
-    if (pendingUrl.current) {
-      URL.revokeObjectURL(pendingUrl.current);
-      pendingUrl.current = null;
-    }
-    setError(null);
-    setIsLoading(false);
-
-    if (!Object.hasOwn(IMAGE_ACCEPT, file.type)) {
-      setError(IMAGE_ERRORS.type);
-      return;
-    }
-    if (file.size > MAX_IMAGE_SIZE) {
-      setError(IMAGE_ERRORS.size);
-      return;
-    }
-    if (file.size === 0) {
-      setError(IMAGE_ERRORS.empty);
-      return;
-    }
-
-    let url: string;
-    try {
-      url = URL.createObjectURL(file);
-    } catch {
-      setError(IMAGE_ERRORS.decode);
-      return;
-    }
-    pendingUrl.current = url;
-    setIsLoading(true);
-    try {
-      const { width, height } = await getDimensions(file, url);
-      if (currentRequest !== requestId.current) return;
-      if (![width, height].every((side) => Number.isSafeInteger(side) && side > 0)) {
-        throw new Error("Image has invalid dimensions");
-      }
-      setImage(file, url, width, height);
-      pendingUrl.current = null;
-      setError(null);
-    } catch {
-      if (currentRequest === requestId.current) setError(IMAGE_ERRORS.decode);
-    } finally {
-      if (pendingUrl.current === url) {
-        URL.revokeObjectURL(url);
-        pendingUrl.current = null;
-      }
-      if (currentRequest === requestId.current) setIsLoading(false);
-    }
-  }, [setImage]);
-
+  const clearFeedback = useCallback(() => { setStatus(null); setIssues([]); }, []);
   useEffect(() => () => {
     requestId.current += 1;
-    if (pendingUrl.current) URL.revokeObjectURL(pendingUrl.current);
-    pendingUrl.current = null;
-    clearStoredImage();
-  }, [clearStoredImage]);
+    // Export snapshots own Files, so unmounting can release all preview URLs safely.
+    const state = useEditorStore.getState();
+    state.batchImages.forEach((image) => URL.revokeObjectURL(image.objectUrl));
+    useEditorStore.setState({ batchImages: [], activeImageId: null, isPreparingImages: false });
+  }, []);
 
-  return { loadImage, clearImage, error, reportError, isLoading };
+  return { loadImages, isLoading, status, issues, clearFeedback };
 }

@@ -3,7 +3,7 @@ import Cropper from "react-easy-crop";
 import { cropToFocalPoint, focalPointToCrop, type CropGeometry } from "@/lib/focalPoint";
 import { getActiveRatio, getMatchingRatioPreset } from "@/lib/ratios";
 import { getSafeZoneForPreset } from "@/constants/safeZones";
-import { useEditorStore } from "@/store/editorStore";
+import { useEditorStore, selectActiveEditor, selectActiveImage } from "@/store/editorStore";
 import type { CropPosition } from "@/types/editor";
 import { SafeZoneOverlay } from "./SafeZoneOverlay";
 
@@ -13,21 +13,21 @@ interface ImageViewportProps {
 }
 
 export function ImageViewport({ url, name }: ImageViewportProps) {
-  const selectedRatioId = useEditorStore((state) => state.selectedRatioId);
-  const customRatio = useEditorStore((state) => state.customRatio);
-  const manualFrameWidth = useEditorStore((state) => state.manualFrameWidth);
+  const selectedRatioId = useEditorStore((state) => selectActiveEditor(state).selectedRatioId);
+  const customRatio = useEditorStore((state) => selectActiveEditor(state).customRatio);
+  const manualFrameWidth = useEditorStore((state) => selectActiveEditor(state).manualFrameWidth);
   const setManualRatio = useEditorStore((state) => state.setManualRatio);
-  const activePlatformPresetId = useEditorStore((state) => state.activePlatformPresetId);
-  const showSafeZone = useEditorStore((state) => state.showSafeZone);
-  const crop = useEditorStore((state) => state.crop);
+  const activePlatformPresetId = useEditorStore((state) => selectActiveEditor(state).activePlatformPresetId);
+  const showSafeZone = useEditorStore((state) => selectActiveEditor(state).showSafeZone);
+  const crop = useEditorStore((state) => selectActiveEditor(state).crop);
   const setCrop = useEditorStore((state) => state.setCrop);
-  const focalPoint = useEditorStore((state) => state.focalPoint);
+  const focalPoint = useEditorStore((state) => selectActiveEditor(state).focalPoint);
   const setFocalPoint = useEditorStore((state) => state.setFocalPoint);
-  const zoom = useEditorStore((state) => state.zoom);
+  const zoom = useEditorStore((state) => selectActiveEditor(state).zoom);
   const minZoom = useEditorStore((state) => state.minZoom);
   const maxZoom = useEditorStore((state) => state.maxZoom);
   const setZoom = useEditorStore((state) => state.setZoom);
-  const viewMode = useEditorStore((state) => state.viewMode);
+  const viewMode = useEditorStore((state) => selectActiveEditor(state).viewMode);
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const viewport = useRef<HTMLDivElement>(null);
@@ -106,19 +106,21 @@ export function ImageViewport({ url, name }: ImageViewportProps) {
   const applyFocalPoint = useCallback(() => {
     if (interaction.current || !mediaSize.current || !cropSize.current) return;
     const state = useEditorStore.getState();
-    if (state.viewMode !== "fill") return;
+    const active = selectActiveImage(state);
+    if (active?.objectUrl !== url || active.editor.viewMode !== "fill") return;
+    const editor = active.editor;
     const geometry: CropGeometry = {
       mediaWidth: mediaSize.current.width,
       mediaHeight: mediaSize.current.height,
       viewportWidth: cropSize.current.width,
       viewportHeight: cropSize.current.height,
-      zoom: state.zoom,
+      zoom: editor.zoom,
     };
-    const next = focalPointToCrop(state.focalPoint, geometry);
-    if (Math.abs(next.x - state.crop.x) > 0.01 || Math.abs(next.y - state.crop.y) > 0.01) {
+    const next = focalPointToCrop(editor.focalPoint, geometry);
+    if (Math.abs(next.x - editor.crop.x) > 0.01 || Math.abs(next.y - editor.crop.y) > 0.01) {
       state.setCrop(next);
     }
-  }, []);
+  }, [url]);
 
   const scheduleFocalPoint = useCallback(() => {
     if (frame.current !== null) cancelAnimationFrame(frame.current);
@@ -141,6 +143,7 @@ export function ImageViewport({ url, name }: ImageViewportProps) {
   }, []);
 
   const handleCropChange = (next: CropPosition) => {
+    if (selectActiveImage(useEditorStore.getState())?.objectUrl !== url) return;
     setCrop(next);
     if (!interaction.current || !mediaSize.current || !cropSize.current) return;
     const geometry: CropGeometry = {
@@ -148,7 +151,7 @@ export function ImageViewport({ url, name }: ImageViewportProps) {
       mediaHeight: mediaSize.current.height,
       viewportWidth: cropSize.current.width,
       viewportHeight: cropSize.current.height,
-      zoom: useEditorStore.getState().zoom,
+      zoom: selectActiveEditor(useEditorStore.getState()).zoom,
     };
     setFocalPoint(cropToFocalPoint(next, geometry));
   };

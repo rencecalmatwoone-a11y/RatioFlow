@@ -1,181 +1,146 @@
 import { create } from "zustand";
-import { DEFAULT_CUSTOM_RATIO, DEFAULT_RATIO, RATIOS, getMatchingRatioPreset, imageRatio, isValidCustomRatio } from "@/lib/ratios";
-import { isValidOutputInput } from "@/lib/exportDimensions";
-import { clampFocalPoint } from "@/lib/focalPoint";
-import { getPlatformPresetById } from "@/constants/platformPresets";
-import type { EditorState } from "@/types/editor";
+import { DEFAULT_CUSTOM_RATIO, DEFAULT_RATIO, RATIOS, getMatchingRatioPreset, imageRatio, isValidCustomRatio } from "../lib/ratios.ts";
+import { isValidOutputInput } from "../lib/exportDimensions.ts";
+import { clampFocalPoint } from "../lib/focalPoint.ts";
+import { createImageEditorState, MAX_ZOOM, MIN_ZOOM, selectActiveImage, selectActiveEditor } from "../lib/batchImages.ts";
+import { getPlatformPresetById } from "../constants/platformPresets.ts";
+import type { EditorState, ImageEditorState } from "../types/editor.ts";
 
-const MIN_ZOOM = 1;
-const MAX_ZOOM = 3;
-const DEFAULT_ZOOM = MIN_ZOOM;
-const DEFAULT_VIEW_MODE = "fill";
-const CENTER = { x: 0, y: 0 };
-const CENTER_FOCAL = { x: 0.5, y: 0.5 };
+export { selectActiveImage, selectActiveEditor } from "../lib/batchImages.ts";
+
+function updateEditor(state: EditorState, id: string | null, patch: Partial<ImageEditorState>): Partial<EditorState> {
+  return { batchImages: state.batchImages.map((image) => image.id === id
+    ? { ...image, editor: { ...image.editor, ...patch } } : image) };
+}
+
+function ratioUpdate(state: EditorState, patch: Partial<ImageEditorState>): Partial<EditorState> {
+  const editor = { ...selectActiveEditor(state), ...patch };
+  return {
+    ...updateEditor(state, state.activeImageId, patch),
+    // Preserve single-photo synchronization. A shoot has explicit shared export targets.
+    ...(state.batchImages.length <= 1 ? {
+      selectedExportRatios: [editor.selectedRatioId],
+      exportRatioConfiguration: { customRatio: { ...editor.customRatio }, platformPresetId: editor.activePlatformPresetId },
+      exportSize: editor.selectedRatioId === "platform" ? { ...state.exportSize, preset: "preset", platformPresetId: editor.activePlatformPresetId }
+        : state.exportSize.preset === "preset" ? { ...state.exportSize, preset: "original", platformPresetId: null } : state.exportSize,
+    } : {}),
+  };
+}
 
 export const useEditorStore = create<EditorState>((set) => ({
-  imageFile: null,
-  imageUrl: null,
-  imageWidth: null,
-  imageHeight: null,
-  imageName: null,
-  selectedRatioId: DEFAULT_RATIO.id,
-  activePlatformPresetId: null,
-  showSafeZone: false,
-  customRatio: DEFAULT_CUSTOM_RATIO,
-  isManualRatio: false,
-  manualFrameWidth: null,
+  batchImages: [], activeImageId: null,
+  minZoom: MIN_ZOOM, maxZoom: MAX_ZOOM,
+  isPreparingImages: false, isExporting: false,
   selectedExportRatios: [DEFAULT_RATIO.id],
-  crop: { x: 0, y: 0 },
-  focalPoint: CENTER_FOCAL,
-  zoom: DEFAULT_ZOOM,
-  minZoom: MIN_ZOOM,
-  maxZoom: MAX_ZOOM,
-  viewMode: DEFAULT_VIEW_MODE,
-  lastFillCrop: CENTER,
-  lastFillZoom: DEFAULT_ZOOM,
-  exportFormat: "png",
-  exportQuality: 0.9,
+  exportRatioConfiguration: { customRatio: { ...DEFAULT_CUSTOM_RATIO }, platformPresetId: null },
+  exportFormat: "png", exportQuality: 0.9,
   exportSize: { preset: "original", customSide: 1920, customAxis: "width" },
-  setExportSizePreset: (preset) => set((state) => ({ exportSize: { ...state.exportSize, preset } })),
+  setIsPreparingImages: (isPreparingImages) => set({ isPreparingImages }),
+  setIsExporting: (isExporting) => set({ isExporting }),
+  addImages: (images) => set((state) => {
+    if (state.isExporting) { images.forEach((image) => URL.revokeObjectURL(image.objectUrl)); return state; }
+    const first = state.batchImages.length === 0 ? images[0]?.editor : undefined;
+    return { batchImages: [...state.batchImages, ...images], activeImageId: state.activeImageId ?? images[0]?.id ?? null,
+      ...(first ? { selectedExportRatios: [first.selectedRatioId],
+        exportRatioConfiguration: { customRatio: { ...first.customRatio }, platformPresetId: first.activePlatformPresetId },
+        exportSize: state.exportSize.preset === "preset" && !first.activePlatformPresetId
+          ? { ...state.exportSize, preset: "original", platformPresetId: null } : state.exportSize } : {}) };
+  }),
+  replaceImage: (id, image) => set((state) => {
+    const previous = state.batchImages.find((item) => item.id === id);
+    if (state.isExporting || !previous) { URL.revokeObjectURL(image.objectUrl); return state; }
+    URL.revokeObjectURL(previous.objectUrl);
+    return { batchImages: state.batchImages.map((item) => item.id === id ? { ...image, id } : item) };
+  }),
+  removeImage: (id) => set((state) => {
+    if (state.isExporting || state.isPreparingImages) return state;
+    const index = state.batchImages.findIndex((image) => image.id === id);
+    if (index < 0) return state;
+    URL.revokeObjectURL(state.batchImages[index].objectUrl);
+    const batchImages = state.batchImages.filter((image) => image.id !== id);
+    return { batchImages, activeImageId: state.activeImageId === id
+      ? batchImages[Math.min(index, batchImages.length - 1)]?.id ?? null : state.activeImageId };
+  }),
+  clearBatch: () => set((state) => {
+    if (state.isExporting || state.isPreparingImages) return state;
+    state.batchImages.forEach((image) => URL.revokeObjectURL(image.objectUrl));
+    return { batchImages: [], activeImageId: null };
+  }),
+  setActiveImage: (id) => set((state) => state.batchImages.some((image) => image.id === id) ? { activeImageId: id } : state),
+  updateImageEditorState: (id, patch) => set((state) => updateEditor(state, id, patch)),
+  applyRatioToAll: () => set((state) => {
+    const active = selectActiveImage(state);
+    if (!active) return state;
+    const { selectedRatioId, customRatio, activePlatformPresetId } = active.editor;
+    return { batchImages: state.batchImages.map((image) => ({ ...image, editor: { ...image.editor,
+      selectedRatioId, activePlatformPresetId, customRatio: selectedRatioId === "free"
+        ? imageRatio(image.width, image.height) : { ...customRatio }, isManualRatio: false, manualFrameWidth: null,
+    } })) };
+  }),
+  setExportSizePreset: (preset) => set((state) => {
+    const platformPresetId = selectActiveEditor(state).activePlatformPresetId
+      ?? state.exportSize.platformPresetId ?? state.exportRatioConfiguration.platformPresetId;
+    if (preset === "preset" && !getPlatformPresetById(platformPresetId)) return state;
+    return { exportSize: { ...state.exportSize, preset, ...(preset === "preset" ? { platformPresetId } : {}) } };
+  }),
   setCustomExportSide: (side, axis) => set((state) => isValidOutputInput(side)
     ? { exportSize: { ...state.exportSize, customSide: side, customAxis: axis } } : state),
+  setExportFormat: (exportFormat) => set({ exportFormat }),
+  setExportQuality: (quality) => set((state) => ({ exportQuality: Number.isFinite(quality) ? Math.min(1, Math.max(0, quality)) : state.exportQuality })),
+  setSelectedRatio: (selectedRatioId) => set((state) => {
+    const image = selectActiveImage(state);
+    return ratioUpdate(state, { selectedRatioId, activePlatformPresetId: null, isManualRatio: false, manualFrameWidth: null,
+      ...(selectedRatioId === "free" && image ? { customRatio: imageRatio(image.width, image.height) } : {}) });
+  }),
+  setActivePlatformPreset: (id) => set((state) => getPlatformPresetById(id)
+    ? ratioUpdate(state, { activePlatformPresetId: id, selectedRatioId: "platform", isManualRatio: false, manualFrameWidth: null }) : state),
   setCustomRatio: (width, height) => set((state) => isValidCustomRatio({ width, height })
-    ? { customRatio: { width, height }, selectedRatioId: "custom", activePlatformPresetId: null, isManualRatio: false, manualFrameWidth: null,
-      selectedExportRatios: ["custom"],
-      exportSize: state.exportSize.preset === "preset" ? { ...state.exportSize, preset: "original" } : state.exportSize } : state),
+    ? ratioUpdate(state, { customRatio: { width, height }, selectedRatioId: "custom", activePlatformPresetId: null, isManualRatio: false, manualFrameWidth: null }) : state),
   setManualRatio: (value, frameWidth) => set((state) => {
     if (!Number.isFinite(value) || value < 0.4 || value > 4 || !Number.isFinite(frameWidth) || frameWidth <= 0) return state;
-    const matchedPreset = getMatchingRatioPreset(value);
-    const ratioId = matchedPreset?.id ?? "custom";
-    return {
-      customRatio: matchedPreset
-        ? { width: matchedPreset.width, height: matchedPreset.height }
-        : { width: Number(value.toFixed(4)), height: 1 },
-      selectedRatioId: ratioId,
-      isManualRatio: true,
-      manualFrameWidth: frameWidth,
-      activePlatformPresetId: null,
-      selectedExportRatios: [ratioId],
-      exportSize: state.exportSize.preset === "preset" ? { ...state.exportSize, preset: "original" } : state.exportSize,
-    };
+    const matched = getMatchingRatioPreset(value);
+    return ratioUpdate(state, { selectedRatioId: matched?.id ?? "custom", customRatio: matched
+      ? { width: matched.width, height: matched.height } : { width: Number(value.toFixed(4)), height: 1 },
+      activePlatformPresetId: null, isManualRatio: true, manualFrameWidth: frameWidth });
   }),
-  setExportFormat: (format) => set({ exportFormat: format }),
-  setExportQuality: (quality) => set((state) => ({
-    exportQuality: Number.isFinite(quality) ? Math.min(1, Math.max(0, quality)) : state.exportQuality,
-  })),
-  setSelectedRatio: (ratioId) => set((state) => ({
-    selectedRatioId: ratioId,
-    ...(ratioId === "free" && state.imageWidth && state.imageHeight
-      ? { customRatio: imageRatio(state.imageWidth, state.imageHeight) } : {}),
-    selectedExportRatios: [ratioId],
-    isManualRatio: false,
-    manualFrameWidth: null,
-    activePlatformPresetId: null,
-    exportSize: state.exportSize.preset === "preset"
-      ? { ...state.exportSize, preset: "original" } : state.exportSize,
-  })),
-  setActivePlatformPreset: (id) => set((state) => getPlatformPresetById(id)
-    ? { activePlatformPresetId: id, selectedRatioId: "platform", selectedExportRatios: ["platform"], isManualRatio: false, manualFrameWidth: null, exportSize: { ...state.exportSize, preset: "preset" } }
-    : state),
-  setShowSafeZone: (show) => set({ showSafeZone: show }),
-  toggleExportRatio: (ratioId) => set((state) => ({
-    selectedExportRatios: state.selectedExportRatios.includes(ratioId)
+  setShowSafeZone: (showSafeZone) => set((state) => updateEditor(state, state.activeImageId, { showSafeZone })),
+  toggleExportRatio: (ratioId) => set((state) => {
+    const editor = selectActiveEditor(state);
+    return { selectedExportRatios: state.selectedExportRatios.includes(ratioId)
       ? state.selectedExportRatios.filter((id) => id !== ratioId)
       : [...RATIOS.filter((ratio) => ratio.id === ratioId || state.selectedExportRatios.includes(ratio.id)).map((ratio) => ratio.id),
         ...(["free", "custom", "platform"] as const).filter((id) => id === ratioId || state.selectedExportRatios.includes(id))],
-  })),
-  selectAllExportRatios: () => set((state) => ({ selectedExportRatios: [
-    ...RATIOS.map((ratio) => ratio.id),
-    ...(state.selectedRatioId === "free" || state.selectedRatioId === "custom" || state.selectedRatioId === "platform" ? [state.selectedRatioId] : []),
-  ] })),
+      exportRatioConfiguration: { ...state.exportRatioConfiguration,
+        ...(ratioId === "custom" && !state.selectedExportRatios.includes(ratioId) ? { customRatio: { ...editor.customRatio } } : {}),
+        ...(ratioId === "platform" && !state.selectedExportRatios.includes(ratioId) ? { platformPresetId: editor.activePlatformPresetId } : {}) } };
+  }),
+  selectAllExportRatios: () => set((state) => {
+    const editor = selectActiveEditor(state);
+    return { selectedExportRatios: [...RATIOS.map((ratio) => ratio.id),
+      ...(editor.selectedRatioId === "free" || editor.selectedRatioId === "custom" || editor.selectedRatioId === "platform" ? [editor.selectedRatioId] : [])],
+      exportRatioConfiguration: { customRatio: { ...editor.customRatio }, platformPresetId: editor.activePlatformPresetId } };
+  }),
   clearExportRatios: () => set({ selectedExportRatios: [] }),
-  setCrop: (crop) => set((state) => ({
-    crop,
-    ...(state.viewMode === "fill" ? { lastFillCrop: crop } : {}),
-  })),
-  setFocalPoint: (point) => set({ focalPoint: clampFocalPoint(point) }),
-  resetFocalPoint: () => set({ focalPoint: CENTER_FOCAL }),
-  resetPosition: () => set((state) => ({
-    crop: CENTER,
-    focalPoint: CENTER_FOCAL,
-    ...(state.viewMode === "fill" ? { lastFillCrop: CENTER } : {}),
-  })),
-  setZoom: (zoom) => set((state) => {
-    const nextZoom = Number.isFinite(zoom)
-      ? Math.min(state.maxZoom, Math.max(state.minZoom, zoom))
-      : state.zoom;
-    return {
-      zoom: nextZoom,
-      ...(state.viewMode === "fill" ? { lastFillZoom: nextZoom } : {}),
-    };
+  setCrop: (crop) => set((state) => updateEditor(state, state.activeImageId, { crop,
+    ...(selectActiveEditor(state).viewMode === "fill" ? { lastFillCrop: crop } : {}) })),
+  setFocalPoint: (point) => set((state) => updateEditor(state, state.activeImageId, { focalPoint: clampFocalPoint(point) })),
+  resetFocalPoint: () => set((state) => updateEditor(state, state.activeImageId, { focalPoint: { x: 0.5, y: 0.5 } })),
+  resetPosition: () => set((state) => updateEditor(state, state.activeImageId, { crop: { x: 0, y: 0 }, focalPoint: { x: 0.5, y: 0.5 }, lastFillCrop: { x: 0, y: 0 } })),
+  setZoom: (value) => set((state) => {
+    const editor = selectActiveEditor(state);
+    const zoom = Number.isFinite(value) ? Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value)) : editor.zoom;
+    return updateEditor(state, state.activeImageId, { zoom, ...(editor.viewMode === "fill" ? { lastFillZoom: zoom } : {}) });
   }),
-  setViewMode: (mode) => set((state) => {
-    if (mode === state.viewMode) return state;
-    return mode === "fit"
-      ? { viewMode: mode, crop: CENTER, zoom: DEFAULT_ZOOM, lastFillCrop: state.crop, lastFillZoom: state.zoom }
-      : { viewMode: mode, crop: state.lastFillCrop, zoom: state.lastFillZoom };
+  setViewMode: (viewMode) => set((state) => {
+    const editor = selectActiveEditor(state);
+    if (viewMode === editor.viewMode) return state;
+    return updateEditor(state, state.activeImageId, viewMode === "fit"
+      ? { viewMode, crop: { x: 0, y: 0 }, zoom: MIN_ZOOM, lastFillCrop: editor.crop, lastFillZoom: editor.zoom }
+      : { viewMode, crop: editor.lastFillCrop, zoom: editor.lastFillZoom });
   }),
-  resetZoom: () => set((state) => ({
-    zoom: DEFAULT_ZOOM,
-    ...(state.viewMode === "fill" ? { lastFillZoom: DEFAULT_ZOOM } : {}),
-  })),
-  resetEditor: () => set({
-    selectedRatioId: DEFAULT_RATIO.id,
-    activePlatformPresetId: null,
-    showSafeZone: false,
-    customRatio: DEFAULT_CUSTOM_RATIO,
-    isManualRatio: false,
-    manualFrameWidth: null,
-    selectedExportRatios: [DEFAULT_RATIO.id],
-    crop: CENTER,
-    focalPoint: CENTER_FOCAL,
-    zoom: DEFAULT_ZOOM,
-    viewMode: DEFAULT_VIEW_MODE,
-    lastFillCrop: CENTER,
-    lastFillZoom: DEFAULT_ZOOM,
-    exportFormat: "png",
-    exportQuality: 0.9,
-    exportSize: { preset: "original", customSide: 1920, customAxis: "width" },
-  }),
-  setImage: (file, url, width, height) =>
-    set((state) => {
-      if (state.imageUrl && state.imageUrl !== url) {
-        URL.revokeObjectURL(state.imageUrl);
-      }
-      return {
-        imageFile: file,
-        imageUrl: url,
-        imageWidth: width,
-        imageHeight: height,
-        imageName: file.name,
-        ...(state.selectedRatioId === "free" ? { customRatio: imageRatio(width, height) } : {}),
-        selectedExportRatios: [state.selectedRatioId],
-        crop: { x: 0, y: 0 },
-        focalPoint: CENTER_FOCAL,
-        zoom: DEFAULT_ZOOM,
-        viewMode: DEFAULT_VIEW_MODE,
-        lastFillCrop: CENTER,
-        lastFillZoom: DEFAULT_ZOOM,
-      };
-    }),
-  clearImage: () =>
-    set((state) => {
-      if (state.imageUrl) {
-        URL.revokeObjectURL(state.imageUrl);
-      }
-      return {
-        imageFile: null,
-        imageUrl: null,
-        imageWidth: null,
-        imageHeight: null,
-        imageName: null,
-        selectedExportRatios: [state.selectedRatioId],
-        crop: { x: 0, y: 0 },
-        focalPoint: CENTER_FOCAL,
-        zoom: DEFAULT_ZOOM,
-        viewMode: DEFAULT_VIEW_MODE,
-        lastFillCrop: CENTER,
-        lastFillZoom: DEFAULT_ZOOM,
-      };
-    }),
+  resetZoom: () => set((state) => updateEditor(state, state.activeImageId, { zoom: MIN_ZOOM,
+    ...(selectActiveEditor(state).viewMode === "fill" ? { lastFillZoom: MIN_ZOOM } : {}) })),
+  resetEditor: () => set((state) => ({ ...ratioUpdate(state, createImageEditorState()),
+    ...(state.batchImages.length <= 1 ? { exportFormat: "png", exportQuality: 0.9,
+      exportSize: { preset: "original", customSide: 1920, customAxis: "width" } } : {}) })),
 }));

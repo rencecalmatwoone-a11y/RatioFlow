@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { parseRatioSide } from "@/lib/ratios";
-import { useEditorStore } from "@/store/editorStore";
+import { useEditorStore, selectActiveEditor } from "@/store/editorStore";
 
 export function CustomRatioControl() {
-  const customRatio = useEditorStore((state) => state.customRatio);
+  const customRatio = useEditorStore((state) => selectActiveEditor(state).customRatio);
   const setCustomRatio = useEditorStore((state) => state.setCustomRatio);
   const [width, setWidth] = useState(String(customRatio.width));
   const [height, setHeight] = useState(String(customRatio.height));

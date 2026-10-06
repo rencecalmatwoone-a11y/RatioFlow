@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useRef, type ChangeEvent } from "react";
-import { IMAGE_ACCEPT, useImage } from "@/hooks/useImage";
+import { useImage } from "@/hooks/useImage";
+import { IMAGE_INPUT_ACCEPT } from "@/constants/batchLimits";
 import { getActiveRatio, getMatchingRatioPreset } from "@/lib/ratios";
 import { calculateExportGeometry } from "@/lib/exportImage";
 import { getPlatformName, getPlatformPresetById } from "@/constants/platformPresets";
 import { getSafeZoneForPreset } from "@/constants/safeZones";
-import { useEditorStore } from "@/store/editorStore";
+import { useEditorStore, selectActiveEditor, selectActiveImage } from "@/store/editorStore";
+import { BatchImageNavigator } from "./BatchImageNavigator";
 import { ExportMenu } from "./ExportMenu";
 import { ImageViewport } from "./ImageViewport";
 import { RatioSelector } from "./RatioSelector";
@@ -14,38 +16,47 @@ import { PlatformPresetSelector } from "./PlatformPresetSelector";
 import { UploadArea } from "./UploadArea";
 import { ZoomControl } from "./ZoomControl";
 
-const inputAccept = Object.entries(IMAGE_ACCEPT)
-  .flatMap(([mime, extensions]) => [mime, ...extensions])
-  .join(",");
-
 export function ImageWorkspace() {
-  const imageUrl = useEditorStore((state) => state.imageUrl);
-  const imageName = useEditorStore((state) => state.imageName);
-  const imageWidth = useEditorStore((state) => state.imageWidth);
-  const imageHeight = useEditorStore((state) => state.imageHeight);
-  const selectedRatioId = useEditorStore((state) => state.selectedRatioId);
-  const customRatio = useEditorStore((state) => state.customRatio);
-  const isManualRatio = useEditorStore((state) => state.isManualRatio);
-  const activePlatformPresetId = useEditorStore((state) => state.activePlatformPresetId);
+  const activeImageId = useEditorStore((state) => state.activeImageId);
+  const imageUrl = useEditorStore((state) => selectActiveImage(state)?.objectUrl);
+  const imageName = useEditorStore((state) => selectActiveImage(state)?.name);
+  const imageWidth = useEditorStore((state) => selectActiveImage(state)?.width);
+  const imageHeight = useEditorStore((state) => selectActiveImage(state)?.height);
+  const imageCount = useEditorStore((state) => state.batchImages.length);
+  const isExporting = useEditorStore((state) => state.isExporting);
+  const removeImage = useEditorStore((state) => state.removeImage);
+  const selectedRatioId = useEditorStore((state) => selectActiveEditor(state).selectedRatioId);
+  const customRatio = useEditorStore((state) => selectActiveEditor(state).customRatio);
+  const isManualRatio = useEditorStore((state) => selectActiveEditor(state).isManualRatio);
+  const activePlatformPresetId = useEditorStore((state) => selectActiveEditor(state).activePlatformPresetId);
   const activePreset = getPlatformPresetById(activePlatformPresetId);
   const currentRatio = getActiveRatio(selectedRatioId, customRatio, activePlatformPresetId);
   const previewRatioLabel = isManualRatio
     ? getMatchingRatioPreset(currentRatio.value)?.label ?? `${currentRatio.value.toFixed(2)}:1`
     : currentRatio.label;
   const safeZone = selectedRatioId === "platform" ? getSafeZoneForPreset(activePlatformPresetId) : undefined;
-  const showSafeZone = useEditorStore((state) => state.showSafeZone);
+  const showSafeZone = useEditorStore((state) => selectActiveEditor(state).showSafeZone);
   const setShowSafeZone = useEditorStore((state) => state.setShowSafeZone);
   const resetPosition = useEditorStore((state) => state.resetPosition);
   const resetEditor = useEditorStore((state) => state.resetEditor);
   const exportSize = useEditorStore((state) => state.exportSize);
-  const zoom = useEditorStore((state) => state.zoom);
-  const viewMode = useEditorStore((state) => state.viewMode);
-  const { loadImage, clearImage, error, reportError, isLoading } = useImage();
+  const exportPresetId = useEditorStore((state) => state.exportSize.platformPresetId ?? null);
+  const zoom = useEditorStore((state) => selectActiveEditor(state).zoom);
+  const viewMode = useEditorStore((state) => selectActiveEditor(state).viewMode);
+  const { loadImages, isLoading, status, issues, clearFeedback } = useImage();
   const replaceInput = useRef<HTMLInputElement>(null);
+  const addInput = useRef<HTMLInputElement>(null);
+  const importFeedback = issues.length > 0 && (
+    <details className="mt-2 text-xs text-[#a54747]">
+      <summary className="min-h-11 cursor-pointer py-3">Review {issues.length} skipped {issues.length === 1 ? "file" : "files"}</summary>
+      <ul className="space-y-1 break-words">{issues.map((issue, index) => <li key={index}>{issue.name}: {issue.reason}</li>)}</ul>
+    </details>
+  );
   let outputDimensions: { width: number; height: number } | null = null;
   if (imageWidth && imageHeight) {
     try {
-      const geometry = calculateExportGeometry(imageWidth, imageHeight, currentRatio, { x: 0.5, y: 0.5 }, zoom, viewMode, exportSize, undefined, activePreset);
+      const outputPreset = exportSize.preset === "preset" ? getPlatformPresetById(exportPresetId) : activePreset;
+      const geometry = calculateExportGeometry(imageWidth, imageHeight, currentRatio, { x: 0.5, y: 0.5 }, zoom, viewMode, exportSize, undefined, outputPreset);
       outputDimensions = { width: geometry.outputWidth, height: geometry.outputHeight };
     } catch {
       // An image that is too small for the selected crop is reported in export options.
@@ -69,9 +80,15 @@ export function ImageWorkspace() {
   }, []);
 
   function handleReplace(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
+    const files = Array.from(event.target.files ?? []);
     event.target.value = "";
-    if (file) void loadImage(file);
+    if (files.length) void loadImages(files, true);
+  }
+
+  function handleAdd(event: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files ?? []);
+    event.target.value = "";
+    void loadImages(files);
   }
 
   if (!imageUrl || !imageName || !imageWidth || !imageHeight) {
@@ -80,20 +97,11 @@ export function ImageWorkspace() {
         <div className="mx-auto mb-10 max-w-[650px] text-center sm:mb-12">
           <p className="mb-4 text-[11px] font-semibold tracking-[0.18em] text-[#6d6d68] uppercase">Your image, your ratio</p>
           <h1 className="text-4xl font-semibold leading-[1.08] tracking-[-0.06em] text-[#181818] sm:text-5xl">Resize images to any aspect ratio. Instantly.</h1>
-          <p className="mx-auto mt-5 max-w-[500px] text-sm leading-6 text-[#62625e] sm:text-base">Choose an image, adjust the frame, and download the result. Everything is processed locally in your browser.</p>
+          <p className="mx-auto mt-5 max-w-[500px] text-sm leading-6 text-[#62625e] sm:text-base">Choose one or more images, adjust the frame, and download the result. Everything is processed locally in your browser.</p>
         </div>
-        <UploadArea onImage={(file) => void loadImage(file)} onError={reportError} error={error} isLoading={isLoading} />
+        <UploadArea onImages={(files) => void loadImages(files)} status={status} isLoading={isLoading} />
+        {importFeedback}
       </div>
-    );
-  }
-
-  if (isLoading) {
-    return (
-      <section aria-label="Image editor" className="mx-auto w-full max-w-[760px]">
-        <div role="status" className="flex min-h-80 items-center justify-center rounded-[24px] border border-[#e8e8e6] bg-white text-sm text-[#62625e] shadow-[0_12px_35px_rgba(0,0,0,0.04)]">
-          Preparing image...
-        </div>
-      </section>
     );
   }
 
@@ -104,7 +112,7 @@ export function ImageWorkspace() {
         <span>Preview</span>
         <span>{previewRatioLabel} frame</span>
       </div>
-      <ImageViewport url={imageUrl} name={imageName} />
+      <ImageViewport key={`${activeImageId}:${imageUrl}`} url={imageUrl} name={imageName} />
       <div className="mt-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-1 text-xs text-[#6b6b66]">
         <div className="min-w-0">
           <p className="truncate font-medium text-[#343430]" title={imageName}>{imageName}</p>
@@ -114,12 +122,15 @@ export function ImageWorkspace() {
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
           <button type="button" onClick={resetPosition} className="min-h-11 text-[#858585] underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#181818]">Reset position</button>
           <button type="button" onClick={resetEditor} className="min-h-11 text-[#555] underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#181818]">Reset</button>
-          <input ref={replaceInput} type="file" accept={inputAccept} onChange={handleReplace} className="sr-only" tabIndex={-1} aria-label="Replace image file" />
-          <button type="button" onClick={() => replaceInput.current?.click()} disabled={isLoading} aria-label="Replace image" className="min-h-11 text-[#555] underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#181818] disabled:opacity-50">Replace Image</button>
-          <button type="button" onClick={clearImage} aria-label="Remove image" className="min-h-11 text-[#858585] underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#181818]">Remove</button>
+          <input ref={replaceInput} type="file" accept={IMAGE_INPUT_ACCEPT} onChange={handleReplace} className="sr-only" tabIndex={-1} aria-label="Replace image file" disabled={isLoading || isExporting} />
+          <input ref={addInput} type="file" multiple accept={IMAGE_INPUT_ACCEPT} onChange={handleAdd} className="sr-only" tabIndex={-1} aria-label="Add image files" disabled={isLoading || isExporting} />
+          <button type="button" onClick={() => replaceInput.current?.click()} disabled={isLoading || isExporting} aria-label="Replace image" className="min-h-11 text-[#555] underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#181818] disabled:opacity-50">Replace Image</button>
+          {imageCount === 1 && <button type="button" onClick={() => addInput.current?.click()} disabled={isLoading || isExporting} className="min-h-11 text-[#555] underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#181818] disabled:opacity-50">+ Add images</button>}
+          <button type="button" onClick={() => { if (activeImageId) removeImage(activeImageId); clearFeedback(); }} disabled={isLoading || isExporting} aria-label="Remove image" className="min-h-11 text-[#858585] underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#181818] disabled:opacity-50">Remove</button>
         </div>
       </div>
-      {error && <p role="status" className="mt-2 px-1 text-sm text-[#a54747]">{error}</p>}
+      <p role="status" aria-live="polite" className="mt-2 px-1 text-xs text-[#62625e] empty:hidden">{status}</p>
+      {importFeedback}
       <div className="mt-7 flex flex-col items-center gap-5 sm:mt-8">
         <div className="flex flex-col items-center gap-1">
           <PlatformPresetSelector />
@@ -142,9 +153,10 @@ export function ImageWorkspace() {
         </div>
         <RatioSelector />
         <ZoomControl />
+        <BatchImageNavigator onAddImages={() => addInput.current?.click()} onClear={clearFeedback} />
         <ExportMenu />
       </div>
-      <p className="mt-7 text-center text-xs text-[#858585]">Processed locally. Your image never leaves your device.</p>
+      <p className="mt-7 text-center text-xs text-[#858585]">Processed locally. Your images never leave your device.</p>
     </section>
   );
 }

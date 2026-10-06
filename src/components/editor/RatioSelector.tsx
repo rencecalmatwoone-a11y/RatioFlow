@@ -1,5 +1,5 @@
 import { getActiveRatio, getMatchingRatioPreset, RATIOS } from "@/lib/ratios";
-import { useEditorStore } from "@/store/editorStore";
+import { useEditorStore, selectActiveEditor } from "@/store/editorStore";
 import { RatioIcon } from "./RatioIcon";
 import { CustomRatioControl } from "./CustomRatioControl";
 import { getPlatformPresetById } from "@/constants/platformPresets";
@@ -8,11 +8,12 @@ const displayOrder: readonly string[] = ["1:1", "4:3", "3:2", "16:9", "9:16", "4
 const displayRatios = [...RATIOS].sort((a, b) => displayOrder.indexOf(a.id) - displayOrder.indexOf(b.id));
 
 export function RatioSelector() {
-  const selectedRatioId = useEditorStore((state) => state.selectedRatioId);
+  const activeImageId = useEditorStore((state) => state.activeImageId);
+  const selectedRatioId = useEditorStore((state) => selectActiveEditor(state).selectedRatioId);
   const setSelectedRatio = useEditorStore((state) => state.setSelectedRatio);
-  const customRatio = useEditorStore((state) => state.customRatio);
-  const isManualRatio = useEditorStore((state) => state.isManualRatio);
-  const activePlatformPresetId = useEditorStore((state) => state.activePlatformPresetId);
+  const customRatio = useEditorStore((state) => selectActiveEditor(state).customRatio);
+  const isManualRatio = useEditorStore((state) => selectActiveEditor(state).isManualRatio);
+  const activePlatformPresetId = useEditorStore((state) => selectActiveEditor(state).activePlatformPresetId);
   const activePreset = getPlatformPresetById(activePlatformPresetId);
   const manualMatch = isManualRatio ? getMatchingRatioPreset(customRatio.width / customRatio.height) : undefined;
 
@@ -47,7 +48,7 @@ export function RatioSelector() {
           </button>
         </div>
       </div>
-      {selectedRatioId === "custom" && !isManualRatio && <CustomRatioControl />}
+      {selectedRatioId === "custom" && !isManualRatio && <CustomRatioControl key={activeImageId} />}
     </div>
   );
 }
