@@ -109,9 +109,12 @@ export function ImageWorkspace() {
   return (
     <section aria-label="Image editor" className="mx-auto w-full max-w-[760px]">
       <h1 className="sr-only">Adjust and download your image</h1>
-      <div className="mb-4 flex items-center justify-between px-1 text-[11px] font-medium tracking-[0.1em] text-[#858585] uppercase sm:mb-5">
-        <span>Preview</span>
-        <span>{previewRatioLabel} frame</span>
+      <div className="mb-4 flex items-center justify-between gap-4 px-1 sm:mb-5">
+        <div className={`flex min-w-0 items-center text-[11px] font-medium tracking-[0.1em] text-[#858585] uppercase ${imageCount === 1 ? "gap-3 sm:gap-4" : "flex-1 justify-between"}`}>
+          <span>Preview</span>
+          <span>{previewRatioLabel} frame</span>
+        </div>
+        {imageCount === 1 && <button type="button" onClick={() => addInput.current?.click()} disabled={isLoading || isExporting} className="min-h-11 shrink-0 text-xs text-[#555] underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#181818] disabled:opacity-50">+ Add images</button>}
       </div>
       <ImageViewport key={`${activeImageId}:${imageUrl}`} url={imageUrl} name={imageName} />
       <div className="mt-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-1 text-xs text-[#6b6b66]">
@@ -126,7 +129,6 @@ export function ImageWorkspace() {
           <input ref={replaceInput} type="file" accept={IMAGE_INPUT_ACCEPT} onChange={handleReplace} className="sr-only" tabIndex={-1} aria-label="Replace image file" disabled={isLoading || isExporting} />
           <input ref={addInput} type="file" multiple accept={IMAGE_INPUT_ACCEPT} onChange={handleAdd} className="sr-only" tabIndex={-1} aria-label="Add image files" disabled={isLoading || isExporting} />
           <button type="button" onClick={() => replaceInput.current?.click()} disabled={isLoading || isExporting} aria-label="Replace image" className="min-h-11 text-[#555] underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#181818] disabled:opacity-50">Replace Image</button>
-          {imageCount === 1 && <button type="button" onClick={() => addInput.current?.click()} disabled={isLoading || isExporting} className="min-h-11 text-[#555] underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#181818] disabled:opacity-50">+ Add images</button>}
           <button type="button" onClick={() => { if (activeImageId) removeImage(activeImageId); clearFeedback(); }} disabled={isLoading || isExporting} aria-label="Remove image" className="min-h-11 text-[#858585] underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#181818] disabled:opacity-50">Remove</button>
         </div>
       </div>
